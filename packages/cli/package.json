@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "clawswarm": "./dist/index.js"
+    "clawswarm": "dist/index.js"
   },
   "exports": {
     ".": {
@@ -46,7 +46,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/trietphan/clawswarm.git",
+    "url": "git+https://github.com/trietphan/clawswarm.git",
     "directory": "packages/cli"
   }
 }
