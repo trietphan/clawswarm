@@ -13,6 +13,10 @@ assign work to specialists, review each other's output, and deliver results.
 
 [Getting Started](docs/getting-started.md) · [Documentation](docs/concepts.md) · [Examples](examples/) · [Dashboard](https://swarmclaw.vercel.app)
 
+<br>
+
+<img src="docs/office-demo.gif" alt="ClawSwarm Virtual Office — agents collaborating in real-time" width="640">
+
 </div>
 
 ---
