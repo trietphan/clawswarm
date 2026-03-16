@@ -12,7 +12,6 @@
 import EventEmitter from 'eventemitter3';
 import {
   Task,
-  Deliverable,
   ReviewResult,
   ChiefReviewConfig,
   ModelId,

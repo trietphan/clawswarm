@@ -4,6 +4,7 @@
 
 ### Your AI Department, Ready in Minutes
 
+[![CI](https://github.com/trietphan/clawswarm/actions/workflows/ci.yml/badge.svg)](https://github.com/trietphan/clawswarm/actions/workflows/ci.yml)
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://makeapullrequest.com)
 
@@ -106,6 +107,15 @@ Goal → Planner (decompose) → Tasks
 Want a visual dashboard with real-time monitoring, pixel art office, and analytics?
 
 → [swarmclaw.vercel.app](https://swarmclaw.vercel.app) (coming soon)
+
+## Documentation Map
+
+- [Getting Started](docs/getting-started.md)
+- [Core Concepts](docs/concepts.md)
+- [API Reference](docs/api-reference.md)
+- [Monorepo Structure](docs/monorepo-structure.md)
+- [Package Exports](docs/package-exports.md)
+- [API Surface Outline](docs/api-surface-outline.md)
 
 ## Contributing
 
