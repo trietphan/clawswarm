@@ -1,0 +1,47 @@
+{
+  "name": "clawswarm",
+  "version": "0.1.0",
+  "description": "Your AI Department, Ready in Minutes — open-source multi-agent orchestration framework",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "eslint packages/*/src --ext .ts",
+    "lint:fix": "eslint packages/*/src --ext .ts --fix",
+    "format": "prettier --write \"packages/*/src/**/*.ts\"",
+    "clean": "rm -rf packages/*/dist packages/*/node_modules node_modules",
+    "dev": "npm run dev --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/trietphan/clawswarm.git"
+  },
+  "homepage": "https://swarmclaw.vercel.app",
+  "bugs": {
+    "url": "https://github.com/trietphan/clawswarm/issues"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "multi-agent",
+    "orchestration",
+    "llm",
+    "automation"
+  ],
+  "license": "MIT"
+}
