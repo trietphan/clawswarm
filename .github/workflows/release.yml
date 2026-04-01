@@ -1,0 +1,83 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Dry run (skip publish)'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build, Test & Publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build all packages
+        run: npm run build
+
+      - name: Run full test suite
+        run: npm test --if-present
+
+      - name: Typecheck
+        run: npx tsc --build
+
+      # ─── npm publish ───────────────────────────────────────────
+      # Uncomment the step below when you're ready to publish.
+      #
+      # Prerequisites:
+      #   1. Remove "private": true from each package.json you want to publish
+      #   2. Set the NPM_TOKEN secret in GitHub repo settings
+      #      (Settings → Secrets → Actions → New repository secret)
+      #   3. Ensure each package has a unique, scoped name (e.g. @clawswarm/core)
+      #   4. Run a manual release first with dry-run=true to verify
+      #
+      # - name: Publish to npm
+      #   if: inputs.dry-run == 'false'
+      #   run: |
+      #     for pkg in packages/*/; do
+      #       if [ -f "$pkg/package.json" ] && ! grep -q '"private": true' "$pkg/package.json"; then
+      #         echo "Publishing $pkg..."
+      #         cd "$pkg"
+      #         npm publish --provenance --access public
+      #         cd -
+      #       fi
+      #     done
+      #   env:
+      #     NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Summary
+        run: |
+          echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Dry run:** ${{ inputs.dry-run }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Node:** $(node -v)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Packages built:** $(ls -d packages/*/dist 2>/dev/null | wc -l | tr -d ' ')" >> $GITHUB_STEP_SUMMARY
