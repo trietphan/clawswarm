@@ -8,6 +8,9 @@
  *   npx tsx examples/custom-agents/index.ts
  */
 
+// Load API keys from environment — see .env.example at the repo root.
+import 'dotenv/config';
+
 import { ClawSwarm, Agent, Task, Deliverable } from '@clawswarm/core';
 
 // ─── Custom Agent: DataAnalyst ────────────────────────────────────────────────

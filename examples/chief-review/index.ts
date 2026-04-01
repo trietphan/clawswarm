@@ -12,6 +12,9 @@
  *   npx tsx examples/chief-review/index.ts
  */
 
+// Load API keys from environment — see .env.example at the repo root.
+import 'dotenv/config';
+
 import { ClawSwarm, Agent, ChiefReviewer, Task, ReviewResult } from '@clawswarm/core';
 
 // ─── Custom Review Handler ────────────────────────────────────────────────────
