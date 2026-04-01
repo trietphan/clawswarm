@@ -155,6 +155,23 @@ export class TaskRouter {
    * Build a typed bridge message.
    * @internal
    */
+  /**
+   * Safely route — wraps broadcast so a single send failure doesn't
+   * propagate up to the caller.
+   * @internal
+   */
+  private _safeBroadcast(
+    orgId: string,
+    message: BridgeMessage,
+    roles?: ClientRole[]
+  ): number {
+    try {
+      return this.bridge.broadcast(orgId, message, roles);
+    } catch {
+      return 0;
+    }
+  }
+
   private _buildMessage(
     type: BridgeMessageType,
     orgId: string,
