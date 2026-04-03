@@ -5,9 +5,9 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { GoalManager, GoalPlanner } from '../goal.js';
-import { TaskManager } from '../task.js';
-import type { GoalStatus, CreateGoalInput } from '../types.js';
+import { GoalManager, GoalPlanner } from '../core/goal.js';
+import { TaskManager } from '../core/task.js';
+import type { GoalStatus, CreateGoalInput } from '../core/types.js';
 
 // ─── GoalManager Tests ────────────────────────────────────────────────────────
 

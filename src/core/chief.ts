@@ -9,7 +9,7 @@
  * @module @clawswarm/core/chief
  */
 
-import EventEmitter from 'eventemitter3';
+import { EventEmitter } from 'eventemitter3';
 import {
   Task,
   ReviewResult,

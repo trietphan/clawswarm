@@ -4,34 +4,47 @@
  *
  * Usage:
  *   clawswarm init [options]
+ *   clawswarm run "<goal>"
  *   clawswarm start [options]
  *   clawswarm status [options]
  *
- * @module @clawswarm/cli
+ * @module clawswarm/cli
  */
 
 import { Command } from 'commander';
 import { initProject } from './commands/init.js';
 import { startBridge } from './commands/start.js';
 import { showStatus } from './commands/status.js';
+import { runGoal } from './commands/run.js';
 
 const program = new Command();
 
 program
   .name('clawswarm')
   .description('🐾 ClawSwarm — Your AI Department, Ready in Minutes')
-  .version('0.1.0');
+  .version('0.3.0-alpha');
 
 // ─── init ─────────────────────────────────────────────────────────────────────
 
 program
   .command('init')
-  .description('Initialize a new ClawSwarm project')
+  .description('Initialize a new ClawSwarm project (interactive wizard)')
   .option('-n, --name <name>', 'Project name')
-  .option('-m, --model <model>', 'Default LLM model for agents', 'claude-sonnet-4')
   .option('-d, --dir <dir>', 'Target directory', process.cwd())
+  .option('-y, --yes', 'Skip prompts and use defaults')
   .action(async (opts) => {
     await initProject(opts).catch(exitOnError);
+  });
+
+// ─── run ──────────────────────────────────────────────────────────────────────
+
+program
+  .command('run <goal>')
+  .description('Execute a goal using the ClawSwarm agent framework')
+  .option('-c, --config <path>', 'Path to clawswarm.config.ts')
+  .option('-v, --verbose', 'Verbose output')
+  .action(async (goal: string, opts) => {
+    await runGoal(goal, opts).catch(exitOnError);
   });
 
 // ─── start ────────────────────────────────────────────────────────────────────

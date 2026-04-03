@@ -4,7 +4,7 @@
  * @module @clawswarm/cli/commands/start
  */
 
-import { BridgeServer } from '@clawswarm/bridge';
+import { BridgeServer } from '../../bridge/bridge.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

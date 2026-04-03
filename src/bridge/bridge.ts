@@ -11,7 +11,7 @@
 import http from 'node:http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
-import EventEmitter from 'eventemitter3';
+import { EventEmitter } from 'eventemitter3';
 import {
   BridgeClient,
   BridgeMessage,
@@ -79,7 +79,7 @@ function resolveConfig(explicit: BridgeServerConfig = {}): Required<BridgeServer
  * console.log('Bridge listening on ws://localhost:8787');
  * ```
  */
-export class BridgeServer extends (EventEmitter as new () => EventEmitter<BridgeServerEvents>) {
+export class BridgeServer extends EventEmitter<BridgeServerEvents> {
   private readonly config: Required<BridgeServerConfig>;
   private wss: WebSocketServer | null = null;
   private httpServer: http.Server | null = null;

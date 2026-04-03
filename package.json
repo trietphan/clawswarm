@@ -1,23 +1,52 @@
 {
   "name": "clawswarm",
-  "version": "0.2.0-alpha",
-  "description": "Your AI Department, Ready in Minutes — open-source multi-agent orchestration framework",
-  "private": true,
-  "workspaces": [
-    "packages/*"
+  "version": "0.3.0-alpha",
+  "description": "Deploy and orchestrate a team of AI agents with built-in planning, task management, and quality review.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "bin": {
+    "clawswarm": "dist/cli/index.js"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "Triet Phan <hello@agentawake.com>",
+  "license": "MIT",
   "scripts": {
-    "build": "npm run build --workspaces",
-    "test": "npm run test --workspaces --if-present",
-    "lint": "eslint 'packages/*/src/**/*.ts'",
-    "lint:fix": "eslint 'packages/*/src/**/*.ts' --fix",
-    "typecheck": "tsc --build",
-    "format": "prettier --write \"packages/*/src/**/*.ts\"",
-    "clean": "rm -rf packages/*/dist packages/*/node_modules node_modules",
-    "dev": "npm run dev --workspaces --if-present"
+    "build": "tsc --project tsconfig.json",
+    "build:watch": "tsc --project tsconfig.json --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.0.0",
+    "enquirer": "^2.4.1",
+    "eventemitter3": "^5.0.0",
+    "ora": "^8.0.0",
+    "uuid": "^9.0.0",
+    "ws": "^8.16.0",
+    "zod": "^3.22.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "@types/uuid": "^9.0.0",
+    "@types/ws": "^8.5.10",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "eslint": "^8.0.0",
@@ -25,24 +54,20 @@
     "typescript": "^5.4.0",
     "vitest": "^1.0.0"
   },
-  "engines": {
-    "node": ">=18.0.0"
-  },
+  "keywords": [
+    "ai",
+    "agents",
+    "swarm",
+    "llm",
+    "orchestration",
+    "clawswarm"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/trietphan/clawswarm.git"
   },
-  "homepage": "https://swarmclaw.vercel.app",
   "bugs": {
     "url": "https://github.com/trietphan/clawswarm/issues"
   },
-  "keywords": [
-    "ai",
-    "agents",
-    "multi-agent",
-    "orchestration",
-    "llm",
-    "automation"
-  ],
-  "license": "MIT"
+  "homepage": "https://github.com/trietphan/clawswarm#readme"
 }

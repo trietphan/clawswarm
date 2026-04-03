@@ -9,7 +9,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import WebSocket from 'ws';
 import http from 'node:http';
-import { BridgeServer } from '../bridge.js';
+import { BridgeServer } from '../bridge/bridge.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -75,6 +75,8 @@ describe('BridgeServer', () => {
   afterEach(async () => {
     if (server) {
       await server.stop().catch(() => {});
+      // Wait for OS to fully release the ports
+      await new Promise((r) => setTimeout(r, 150));
     }
   });
 

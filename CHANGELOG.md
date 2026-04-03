@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-alpha] - 2026-04-03
+
+### ⚠️ Breaking Changes
+
+- **Single package**: All packages (`@clawswarm/core`, `@clawswarm/bridge`, `@clawswarm/cli`) have been merged into a single `clawswarm` package. Update your imports:
+  - Before: `import { ClawSwarm } from '@clawswarm/core'`
+  - After: `import { ClawSwarm } from 'clawswarm'`
+- `clawswarm init` is now an interactive wizard — use `--yes` to skip prompts and use defaults
+
+### Added
+
+- **`clawswarm run "<goal>"` CLI command** — Execute any goal directly from the terminal. Reads `clawswarm.config.ts` from CWD (or uses defaults). Shows real-time progress and prints deliverables at the end.
+  ```bash
+  clawswarm run "Research the top 5 AI frameworks in 2026"
+  ```
+- **Interactive `clawswarm init` wizard** — Powered by `enquirer`. Guides users through:
+  - Project name selection
+  - LLM provider multi-select (Anthropic, OpenAI, Google)
+  - Default model per provider
+  - Bridge server configuration
+  - API key collection with live validation (test calls to provider APIs)
+  - Generates `.env` with actual keys (not just `.env.example`)
+  - Generates `clawswarm.config.ts` based on selections
+  - Runs `npm init -y` + `npm install clawswarm` if no `package.json` exists
+- **Single-package architecture** — Entire codebase (core + bridge + CLI) consolidated into `src/` at repo root
+  - `src/core/` — Agent, ClawSwarm, ChiefReviewer, GoalManager, TaskManager
+  - `src/bridge/` — BridgeServer, TaskRouter
+  - `src/cli/` — CLI entry point and commands
+  - `src/index.ts` — unified public API entry point
+- **Vitest config** at repo root replacing per-package configs
+- **Simplified CI** — single `npm ci` + `npm run build` + `npm test` (no workspace orchestration)
+
+### Removed
+
+- Monorepo workspace structure (`packages/` directory)
+- `@clawswarm/core`, `@clawswarm/bridge`, `@clawswarm/cli` package names (replaced by `clawswarm`)
+- Turborepo cache step in CI (no longer needed for single package)
+
+---
+
 ## [0.2.0-alpha] - 2026-04-03
 
 ### ⚠️ Breaking Changes
