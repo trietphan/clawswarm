@@ -75,6 +75,8 @@ describe('BridgeServer', () => {
   afterEach(async () => {
     if (server) {
       await server.stop().catch(() => {});
+      // Wait for OS to fully release the ports
+      await new Promise((r) => setTimeout(r, 150));
     }
   });
 
