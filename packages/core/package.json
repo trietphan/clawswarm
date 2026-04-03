@@ -1,6 +1,6 @@
 {
   "name": "@clawswarm/core",
-  "version": "0.1.0-alpha",
+  "version": "0.2.0-alpha",
   "description": "Core agent framework for ClawSwarm",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -63,5 +63,18 @@
     "type": "git",
     "url": "git+https://github.com/trietphan/clawswarm.git",
     "directory": "packages/core"
+  },
+  "author": "Triet Phan <hello@agentawake.com>",
+  "homepage": "https://github.com/trietphan/clawswarm/tree/main/packages/core#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
   }
 }

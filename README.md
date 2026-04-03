@@ -189,6 +189,29 @@ const config: SwarmConfig = {
 | [Goals & Tasks](docs/goals-and-tasks.md) | Goal decomposition, task lifecycle |
 | [API Reference](docs/api-reference.md) | Full TypeScript API docs |
 
+## Upgrading from 0.1.0-alpha
+
+If you're upgrading from `0.1.0-alpha`, here's what changed:
+
+```bash
+npm install @clawswarm/core@0.2.0-alpha @clawswarm/bridge@0.2.0-alpha
+```
+
+**Breaking changes:**
+- `swarm.execute()` now accepts a goal object directly — no need for `swarm.createGoal()` first
+- Bridge auth moved to `BRIDGE_AUTH_TOKENS` env var (comma-separated) instead of hardcoded config
+- Minimum Node.js version bumped to 18.x
+
+**New features:**
+- Chief review system with auto-approve/review/reject thresholds
+- Bridge health endpoint (`GET /health`)
+- Graceful shutdown on SIGTERM/SIGINT
+- Connection limits with `maxConnections`
+- Per-agent cost tracking
+- Full typed event system
+
+See [CHANGELOG.md](CHANGELOG.md) for the complete list.
+
 ## Contributing
 
 We welcome contributions of all kinds — bug fixes, new agents, docs improvements, and feature ideas.

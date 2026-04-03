@@ -1,6 +1,6 @@
 {
   "name": "clawswarm",
-  "version": "0.1.0",
+  "version": "0.2.0-alpha",
   "description": "Your AI Department, Ready in Minutes — open-source multi-agent orchestration framework",
   "private": true,
   "workspaces": [

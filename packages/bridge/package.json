@@ -1,6 +1,6 @@
 {
   "name": "@clawswarm/bridge",
-  "version": "0.1.0-alpha",
+  "version": "0.2.0-alpha",
   "description": "WebSocket bridge server for ClawSwarm — real-time agent communication and org-scoped task routing",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -35,7 +35,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@clawswarm/core": "0.1.0-alpha",
+    "@clawswarm/core": "0.2.0-alpha",
     "eventemitter3": "^5.0.0",
     "ws": "^8.16.0",
     "uuid": "^9.0.0"
@@ -60,5 +60,18 @@
     "type": "git",
     "url": "git+https://github.com/trietphan/clawswarm.git",
     "directory": "packages/bridge"
+  },
+  "author": "Triet Phan <hello@agentawake.com>",
+  "homepage": "https://github.com/trietphan/clawswarm/tree/main/packages/bridge#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
   }
 }
