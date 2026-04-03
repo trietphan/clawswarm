@@ -4,7 +4,7 @@
 
 **A TypeScript framework for orchestrating multi-agent AI swarms with hierarchical review.**
 
-[![npm version](https://img.shields.io/npm/v/clawswarm?color=blue)](https://www.npmjs.com/package/clawswarm)
+[![npm version](https://img.shields.io/npm/v/clawswarm-ai?color=blue)](https://www.npmjs.com/package/clawswarm-ai)
 [![CI](https://github.com/trietphan/clawswarm/actions/workflows/ci.yml/badge.svg)](https://github.com/trietphan/clawswarm/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://makeapullrequest.com)
@@ -40,13 +40,13 @@ The result? Higher-quality output, automatic error recovery, and full cost visib
 ### Install
 
 ```bash
-npm install clawswarm
+npm install clawswarm-ai
 ```
 
 ### Run Your First Swarm
 
 ```typescript
-import { ClawSwarm, Agent, BridgeServer } from 'clawswarm';
+import { ClawSwarm, Agent, BridgeServer } from 'clawswarm-ai';
 
 const swarm = new ClawSwarm({
   agents: [
@@ -158,8 +158,8 @@ src/
 All exports are available from the single package:
 
 ```typescript
-import { ClawSwarm, Agent, BridgeServer } from 'clawswarm';
-import type { SwarmConfig, Goal, Task, AgentType } from 'clawswarm';
+import { ClawSwarm, Agent, BridgeServer } from 'clawswarm-ai';
+import type { SwarmConfig, Goal, Task, AgentType } from 'clawswarm-ai';
 ```
 
 ## Configuration
@@ -232,11 +232,11 @@ import { BridgeServer } from '@clawswarm/bridge';
 
 **After (0.3.x):**
 ```bash
-npm install clawswarm
+npm install clawswarm-ai
 ```
 
 ```typescript
-import { ClawSwarm, BridgeServer } from 'clawswarm';
+import { ClawSwarm, BridgeServer } from 'clawswarm-ai';
 ```
 
 **Breaking changes:**

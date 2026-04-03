@@ -5,7 +5,7 @@
  *
  * @example
  * ```typescript
- * import { ClawSwarm, Agent, BridgeServer } from 'clawswarm';
+ * import { ClawSwarm, Agent, BridgeServer } from 'clawswarm-ai';
  * ```
  *
  * @module clawswarm

@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Single package**: All packages (`@clawswarm/core`, `@clawswarm/bridge`, `@clawswarm/cli`) have been merged into a single `clawswarm` package. Update your imports:
   - Before: `import { ClawSwarm } from '@clawswarm/core'`
-  - After: `import { ClawSwarm } from 'clawswarm'`
+  - After: `import { ClawSwarm } from 'clawswarm-ai'`
 - `clawswarm init` is now an interactive wizard — use `--yes` to skip prompts and use defaults
 
 ### Added
@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - API key collection with live validation (test calls to provider APIs)
   - Generates `.env` with actual keys (not just `.env.example`)
   - Generates `clawswarm.config.ts` based on selections
-  - Runs `npm init -y` + `npm install clawswarm` if no `package.json` exists
+  - Runs `npm init -y` + `npm install clawswarm-ai` if no `package.json` exists
 - **Single-package architecture** — Entire codebase (core + bridge + CLI) consolidated into `src/` at repo root
   - `src/core/` — Agent, ClawSwarm, ChiefReviewer, GoalManager, TaskManager
   - `src/bridge/` — BridgeServer, TaskRouter

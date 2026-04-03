@@ -119,12 +119,12 @@ export async function initProject(options: InitOptions = {}): Promise<void> {
     }
   }
 
-  console.log('\n  📦 Installing clawswarm...');
+  console.log('\n  📦 Installing clawswarm-ai...');
   try {
-    execSync('npm install clawswarm', { cwd, stdio: 'inherit' });
-    console.log('  ✓ clawswarm installed');
+    execSync('npm install clawswarm-ai', { cwd, stdio: 'inherit' });
+    console.log('  ✓ clawswarm-ai installed');
   } catch {
-    console.warn('  ⚠  npm install failed — you can run it manually: npm install clawswarm');
+    console.warn('  ⚠  npm install failed — you can run it manually: npm install clawswarm-ai-ai');
   }
 
   console.log(`
@@ -298,7 +298,7 @@ function generateConfig(answers: WizardAnswers): string {
   bridgeUrl: process.env['CLAWSWARM_BRIDGE_URL'],\n`
     : '';
 
-  return `import { SwarmConfig, Agent } from 'clawswarm';
+  return `import { SwarmConfig, Agent } from 'clawswarm-ai';
 
 /**
  * ClawSwarm configuration for ${answers.projectName}.
@@ -364,7 +364,7 @@ function generateEnvExample(providers: string[]): string {
 }
 
 function generateExampleGoal(answers: WizardAnswers): string {
-  return `import { ClawSwarm } from 'clawswarm';
+  return `import { ClawSwarm } from 'clawswarm-ai';
 import config from '../clawswarm.config.js';
 
 async function main() {
