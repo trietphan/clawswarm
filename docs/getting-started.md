@@ -141,6 +141,37 @@ Goal → Planner → Tasks
         ≥8 OK    5-7 👀   <5 rework
 ```
 
+## Try It Yourself
+
+The `examples/` directory contains ready-to-run scripts that demonstrate key features. Set up your `.env` file and run any of them directly:
+
+### Basic Goal
+The simplest ClawSwarm workflow — define a goal, execute it, collect deliverables.
+```bash
+npx tsx examples/basic-goal/index.ts
+```
+
+### Chief Review
+Customize the quality gate with strict/lenient thresholds, custom criteria, and human review handling.
+```bash
+npx tsx examples/chief-review/index.ts
+```
+
+### Custom Agents
+Build your own specialist agents with custom tools, prompts, and logic.
+```bash
+npx tsx examples/custom-agents/index.ts
+```
+
+### Bridge Realtime
+Run a swarm with the Bridge server for real-time WebSocket monitoring — connect a dashboard or CLI client.
+```bash
+npx tsx examples/bridge-realtime/index.ts
+# Then connect to ws://localhost:8080 for live events
+```
+
+Each example directory has its own README with setup details and expected output.
+
 ## Next Steps
 
 - [Core Concepts](concepts.md) — understand agents, goals, tasks, and chief review

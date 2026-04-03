@@ -9,10 +9,16 @@
  *   npx tsx examples/basic-goal/index.ts
  */
 
+// Load API keys from .env (ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.)
+// See .env.example for the full list of supported variables.
+import 'dotenv/config';
+
 import { ClawSwarm, Agent } from '@clawswarm/core';
 
 async function main() {
-  // 1. Create the swarm with specialist agents
+  // 1. Create the swarm with specialist agents.
+  //    Each Agent.xxx() factory creates a pre-configured specialist.
+  //    API keys are read from environment variables automatically.
   const swarm = new ClawSwarm({
     agents: [
       Agent.research({ model: 'claude-sonnet-4' }),
@@ -25,7 +31,9 @@ async function main() {
     },
   });
 
-  // 2. Listen to events for observability
+  // 2. Listen to events for observability.
+  //    The swarm emits typed events at each lifecycle stage —
+  //    useful for logging, dashboards, or integrations.
   swarm.on('goal:planning', (goal) => {
     console.log(`\n📋 Planning: ${goal.title}`);
   });
@@ -66,7 +74,9 @@ async function main() {
     console.error(`\n💥 Goal failed: ${goal.title}`, error.message);
   });
 
-  // 3. Define the goal
+  // 3. Define the goal.
+  //    A goal is a high-level objective. The Planner agent will
+  //    automatically decompose it into concrete tasks for specialists.
   const goal = swarm.createGoal({
     title: 'Research the top AI agent frameworks',
     description: `
@@ -86,7 +96,8 @@ async function main() {
   console.log(`\n🚀 Executing goal: "${goal.title}"`);
   console.log(`   ID: ${goal.id}`);
 
-  // 4. Execute — the swarm handles everything
+  // 4. Execute — the swarm handles planning, execution, and review.
+  //    Returns a result object with deliverables, cost, and metadata.
   const result = await swarm.execute(goal);
 
   // 5. Display results
