@@ -4,7 +4,7 @@
 
 **A TypeScript framework for orchestrating multi-agent AI swarms with hierarchical review.**
 
-[![npm version](https://img.shields.io/npm/v/@clawswarm/core?color=blue)](https://www.npmjs.com/package/@clawswarm/core)
+[![npm version](https://img.shields.io/npm/v/clawswarm?color=blue)](https://www.npmjs.com/package/clawswarm)
 [![CI](https://github.com/trietphan/clawswarm/actions/workflows/ci.yml/badge.svg)](https://github.com/trietphan/clawswarm/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://makeapullrequest.com)
@@ -40,13 +40,13 @@ The result? Higher-quality output, automatic error recovery, and full cost visib
 ### Install
 
 ```bash
-npm install @clawswarm/core @clawswarm/bridge
+npm install clawswarm
 ```
 
 ### Run Your First Swarm
 
 ```typescript
-import { ClawSwarm, Agent, Goal } from '@clawswarm/core';
+import { ClawSwarm, Agent, BridgeServer } from 'clawswarm';
 
 const swarm = new ClawSwarm({
   agents: [
@@ -71,6 +71,22 @@ console.log(result.deliverables);
 ```
 
 That's it — the planner decomposes the goal, agents execute in parallel where possible, and every output passes chief review before being delivered.
+
+### CLI
+
+```bash
+# Initialize a new project (interactive wizard)
+npx clawswarm init
+
+# Execute a goal from the command line
+npx clawswarm run "Research the top 5 AI frameworks in 2026"
+
+# Start the bridge server for real-time updates
+npx clawswarm start
+
+# Show agent and task status
+npx clawswarm status
+```
 
 ## Architecture
 
@@ -128,13 +144,22 @@ Chief Review   Chief Review   Chief Review
 
 </details>
 
-## Monorepo Structure
+## Package Structure
+
+As of `0.3.0-alpha`, ClawSwarm ships as a **single npm package**:
 
 ```
-packages/
-├── core/       # Swarm engine: agents, planner, chief review, goal execution
-├── bridge/     # WebSocket bridge for real-time agent communication
-└── cli/        # CLI tool for initializing and running swarms
+src/
+├── core/        # Swarm engine: agents, planner, chief review, goal execution
+├── bridge/      # WebSocket bridge for real-time agent communication
+└── cli/         # CLI entry point (clawswarm init, run, start, status)
+```
+
+All exports are available from the single package:
+
+```typescript
+import { ClawSwarm, Agent, BridgeServer } from 'clawswarm';
+import type { SwarmConfig, Goal, Task, AgentType } from 'clawswarm';
 ```
 
 ## Configuration
@@ -189,13 +214,38 @@ const config: SwarmConfig = {
 | [Goals & Tasks](docs/goals-and-tasks.md) | Goal decomposition, task lifecycle |
 | [API Reference](docs/api-reference.md) | Full TypeScript API docs |
 
-## Upgrading from 0.1.0-alpha
+## Upgrading
 
-If you're upgrading from `0.1.0-alpha`, here's what changed:
+### Upgrading from 0.2.0-alpha
 
+If you're upgrading from `0.2.0-alpha` (the 3-package monorepo), here's what changed:
+
+**Before (0.2.x):**
 ```bash
-npm install @clawswarm/core@0.2.0-alpha @clawswarm/bridge@0.2.0-alpha
+npm install @clawswarm/core @clawswarm/bridge @clawswarm/cli
 ```
+
+```typescript
+import { ClawSwarm } from '@clawswarm/core';
+import { BridgeServer } from '@clawswarm/bridge';
+```
+
+**After (0.3.x):**
+```bash
+npm install clawswarm
+```
+
+```typescript
+import { ClawSwarm, BridgeServer } from 'clawswarm';
+```
+
+**Breaking changes:**
+- All packages merged into a single `clawswarm` package — remove `@clawswarm/core`, `@clawswarm/bridge`, `@clawswarm/cli` from your dependencies
+- Update all imports from `@clawswarm/*` to `clawswarm`
+- `clawswarm init` is now an interactive wizard (use `--yes` to skip prompts and use defaults)
+- New `clawswarm run "<goal>"` command for one-shot goal execution from CLI
+
+### Upgrading from 0.1.0-alpha
 
 **Breaking changes:**
 - `swarm.execute()` now accepts a goal object directly — no need for `swarm.createGoal()` first

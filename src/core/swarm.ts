@@ -3,7 +3,7 @@
  * @module @clawswarm/core/swarm
  */
 
-import EventEmitter from 'eventemitter3';
+import { EventEmitter } from 'eventemitter3';
 import {
   SwarmConfig,
   GoalResult,

@@ -33,7 +33,7 @@ jobs:
         run: npm run lint
 
       - name: Typecheck
-        run: npx tsc --build
+        run: npx tsc --noEmit
 
   build-and-test:
     name: Build & Test (Node ${{ matrix.node-version }})
@@ -56,19 +56,11 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
 
-      - name: Cache Turborepo
-        uses: actions/cache@v4
-        with:
-          path: node_modules/.cache/turbo
-          key: turbo-${{ runner.os }}-node${{ matrix.node-version }}-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            turbo-${{ runner.os }}-node${{ matrix.node-version }}-
-
       - name: Install dependencies
         run: npm ci
 
-      - name: Build all packages
+      - name: Build package
         run: npm run build
 
       - name: Run tests
-        run: npm test --if-present
+        run: npm test

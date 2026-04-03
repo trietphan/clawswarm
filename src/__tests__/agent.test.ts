@@ -5,8 +5,8 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { Agent } from '../agent.js';
-import type { AgentConfig, Task, Deliverable } from '../types.js';
+import { Agent } from '../core/agent.js';
+import type { AgentConfig, Task, Deliverable } from '../core/types.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

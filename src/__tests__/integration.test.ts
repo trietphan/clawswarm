@@ -10,11 +10,11 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ClawSwarm } from '../clawswarm.js';
-import { Agent } from '../agent.js';
-import { TaskManager } from '../task.js';
-import { GoalManager } from '../goal.js';
-import { ChiefReviewer } from '../chief.js';
+import { ClawSwarm } from '../core/clawswarm.js';
+import { Agent } from '../core/agent.js';
+import { TaskManager } from '../core/task.js';
+import { GoalManager } from '../core/goal.js';
+import { ChiefReviewer } from '../core/chief.js';
 import type {
   Task,
   Deliverable,
@@ -23,7 +23,7 @@ import type {
   TaskStatus,
   GoalStatus,
   AgentType,
-} from '../types.js';
+} from '../core/types.js';
 
 // ─── Mock Agents ──────────────────────────────────────────────────────────────
 

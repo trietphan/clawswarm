@@ -5,15 +5,15 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { ClawSwarm } from '../clawswarm.js';
-import { Agent } from '../agent.js';
+import { ClawSwarm } from '../core/clawswarm.js';
+import { Agent } from '../core/agent.js';
 import type {
   AgentType,
   AgentConfig,
   Task,
   Deliverable,
   SwarmConfig,
-} from '../types.js';
+} from '../core/types.js';
 
 // ─── Mock Agent ────────────────────────────────────────────────────────────────
 

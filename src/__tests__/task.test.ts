@@ -5,8 +5,8 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { TaskManager } from '../task.js';
-import type { Deliverable, TaskStatus } from '../types.js';
+import { TaskManager } from '../core/task.js';
+import type { Deliverable, TaskStatus } from '../core/types.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

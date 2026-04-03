@@ -7,7 +7,7 @@
  * @module @clawswarm/core/clawswarm
  */
 
-import EventEmitter from 'eventemitter3';
+import { EventEmitter } from 'eventemitter3';
 import { Agent } from './agent.js';
 import { GoalManager, GoalPlanner } from './goal.js';
 import { TaskManager } from './task.js';
@@ -44,7 +44,7 @@ import {
  * const result = await swarm.execute(goal);
  * ```
  */
-export class ClawSwarm extends (EventEmitter as new () => EventEmitter<SwarmEvents>) {
+export class ClawSwarm extends EventEmitter<SwarmEvents> {
   private readonly goalManager: GoalManager;
   private readonly taskManager: TaskManager;
   private readonly planner: GoalPlanner;

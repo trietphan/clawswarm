@@ -6,9 +6,9 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { ChiefReviewer } from '../chief.js';
-import { TaskManager } from '../task.js';
-import type { Task, Deliverable } from '../types.js';
+import { ChiefReviewer } from '../core/chief.js';
+import { TaskManager } from '../core/task.js';
+import type { Task, Deliverable } from '../core/types.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
