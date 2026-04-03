@@ -4,7 +4,7 @@
  * goal creation, and execution pipeline (with mocked agents).
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from 'vitest';
 import { ClawSwarm } from '../core/clawswarm.js';
 import { Agent } from '../core/agent.js';
 import type {
@@ -14,6 +14,21 @@ import type {
   Deliverable,
   SwarmConfig,
 } from '../core/types.js';
+
+// Clear API keys so LLM providers use fallback/stub behavior in tests
+const savedEnv: Record<string, string | undefined> = {};
+beforeAll(() => {
+  for (const key of ['GEMINI_API_KEY', 'GOOGLE_AI_API_KEY', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY']) {
+    savedEnv[key] = process.env[key];
+    delete process.env[key];
+  }
+});
+afterAll(() => {
+  for (const [key, val] of Object.entries(savedEnv)) {
+    if (val !== undefined) process.env[key] = val;
+    else delete process.env[key];
+  }
+});
 
 // ─── Mock Agent ────────────────────────────────────────────────────────────────
 

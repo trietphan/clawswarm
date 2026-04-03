@@ -170,34 +170,43 @@ Respond in JSON:
   private async _callReviewerLLM(task: Task): Promise<RawReviewResponse> {
     const prompt = this._buildPrompt(task);
 
-    try {
-      const provider = await createProvider(this.reviewerModel);
-      const response = await provider.chat(
-        [{ role: 'user', content: prompt }],
-        { responseFormat: 'json', temperature: 0.2 }
-      );
+    // Try configured model first, then fall back to any available provider
+    const modelsToTry: ModelId[] = [
+      this.reviewerModel,
+      'gemini-pro', 'gemini-flash',
+      'claude-sonnet-4', 'claude-opus-4',
+      'gpt-4o', 'gpt-4o-mini',
+    ].filter((m, i, a) => a.indexOf(m) === i) as ModelId[];
 
-      const parsed = JSON.parse(response.content);
+    for (const model of modelsToTry) {
+      try {
+        const provider = await createProvider(model);
+        const response = await provider.chat(
+          [{ role: 'user', content: prompt }],
+          { responseFormat: 'json', temperature: 0.2 }
+        );
 
-      // Normalize parsed response
-      const score = typeof parsed.overallScore === 'number'
-        ? parsed.overallScore
-        : typeof parsed.score === 'number'
-          ? parsed.score
-          : 5;
+        const parsed = JSON.parse(response.content);
 
-      return {
-        score,
-        issues: Array.isArray(parsed.issues) ? parsed.issues : [],
-        suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions : [],
-        feedback: typeof parsed.feedback === 'string' ? parsed.feedback : 'Review completed.',
-      };
-    } catch (err) {
-      // LLM review failed — fall back to heuristics
-      const msg = err instanceof Error ? err.message : String(err);
-      console.warn(`[ChiefReviewer] LLM review failed, using heuristics: ${msg}`);
+        const score = typeof parsed.overallScore === 'number'
+          ? parsed.overallScore
+          : typeof parsed.score === 'number'
+            ? parsed.score
+            : 5;
+
+        return {
+          score,
+          issues: Array.isArray(parsed.issues) ? parsed.issues : [],
+          suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions : [],
+          feedback: typeof parsed.feedback === 'string' ? parsed.feedback : 'Review completed.',
+        };
+      } catch {
+        // Try next model
+        continue;
+      }
     }
 
+    console.warn(`[ChiefReviewer] No LLM provider available, using heuristics`);
     return this._heuristicReview(task);
   }
 

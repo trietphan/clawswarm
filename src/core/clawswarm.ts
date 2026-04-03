@@ -110,13 +110,8 @@ export class ClawSwarm extends EventEmitter<SwarmEvents> {
 
       while (!this.taskManager.isGoalDone(goal.id) && iterations < maxIterations) {
         iterations++;
-        const ready = this.taskManager.getReady(goal.id);
-        if (ready.length === 0) break;
 
-        // Run ready tasks concurrently
-        await Promise.all(ready.map(task => this._executeTask(task)));
-
-        // Check for human review requirement
+        // First, review any tasks waiting for review (from previous iteration or rework)
         const reviewTasks = this.taskManager
           .getByGoal(goal.id)
           .filter(t => t.status === 'review');
@@ -126,14 +121,30 @@ export class ClawSwarm extends EventEmitter<SwarmEvents> {
           hadHumanReview = hadHumanReview || (review.decision === 'human_review');
           await this._handleReview(task, review);
         }
+
+        // Then, run any newly ready tasks
+        const ready = this.taskManager.getReady(goal.id);
+        if (ready.length === 0 && reviewTasks.length === 0) break;
+        if (ready.length > 0) {
+          await Promise.all(ready.map(task => this._executeTask(task)));
+        }
       }
 
-      // 3. Collect deliverables
+      // 3. Collect deliverables and aggregate token usage
       const completedTasks = this.taskManager
         .getByGoal(goal.id)
         .filter(t => t.status === 'completed');
 
       const allDeliverables = completedTasks.flatMap(t => t.deliverables);
+
+      // Aggregate token usage from tasks
+      let totalTokens = 0;
+      const allTasks = this.taskManager.getByGoal(goal.id);
+      for (const t of allTasks) {
+        const usage = (t as unknown as Record<string, unknown>)._tokenUsage as
+          { totalTokens?: number } | undefined;
+        if (usage?.totalTokens) totalTokens += usage.totalTokens;
+      }
 
       const updatedGoal = this.goalManager.setStatus(goal.id, 'completed');
       this.emit('goal:completed', updatedGoal);
@@ -141,7 +152,7 @@ export class ClawSwarm extends EventEmitter<SwarmEvents> {
       return {
         goal: updatedGoal,
         deliverables: allDeliverables,
-        cost: updatedGoal.cost,
+        cost: { ...updatedGoal.cost, totalTokens },
         hadHumanReview,
         durationMs: Date.now() - startTime,
       };
@@ -199,6 +210,26 @@ export class ClawSwarm extends EventEmitter<SwarmEvents> {
     try {
       this.taskManager.assign(task.id, agentType);
       this.emit('task:assigned', task, agentType);
+
+      // Inject dependency context from completed predecessor tasks
+      if (task.dependsOn && task.dependsOn.length > 0) {
+        const contextParts: string[] = [];
+        for (const depId of task.dependsOn) {
+          const depTask = this.taskManager.get(depId);
+          if (depTask && depTask.deliverables.length > 0) {
+            for (const d of depTask.deliverables) {
+              // Truncate large deliverables to avoid token explosion
+              const content = typeof d.content === 'string' && d.content.length > 4000
+                ? d.content.slice(0, 4000) + '\n... [truncated]'
+                : d.content;
+              contextParts.push(`### ${depTask.title}\n${content}`);
+            }
+          }
+        }
+        if (contextParts.length > 0) {
+          (task as unknown as Record<string, unknown>)._dependencyContext = contextParts.join('\n\n');
+        }
+      }
 
       this.taskManager.start(task.id);
       this.emit('task:started', task);

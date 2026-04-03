@@ -5,9 +5,23 @@
  * config validation, and event emission.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from 'vitest';
 import { ChiefReviewer } from '../core/chief.js';
 import { TaskManager } from '../core/task.js';
+
+const savedEnv: Record<string, string | undefined> = {};
+beforeAll(() => {
+  for (const key of ['GEMINI_API_KEY', 'GOOGLE_AI_API_KEY', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY']) {
+    savedEnv[key] = process.env[key];
+    delete process.env[key];
+  }
+});
+afterAll(() => {
+  for (const [key, val] of Object.entries(savedEnv)) {
+    if (val !== undefined) process.env[key] = val;
+    else delete process.env[key];
+  }
+});
 import type { Task, Deliverable } from '../core/types.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

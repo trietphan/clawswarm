@@ -89,6 +89,17 @@ export class Agent {
 
     const content = response.content.trim();
 
+    // Track usage on the task for cost aggregation
+    if (response.usage) {
+      (task as unknown as Record<string, unknown>)._tokenUsage = {
+        agentId: this.id,
+        agentName: this.name,
+        promptTokens: response.usage.promptTokens,
+        completionTokens: response.usage.completionTokens,
+        totalTokens: response.usage.totalTokens,
+      };
+    }
+
     // Determine deliverable type based on agent type
     const deliverableType = this._inferDeliverableType(content);
 
@@ -191,9 +202,10 @@ export class Agent {
     return parts.join('\n');
   }
 
-  private _buildDependencyContext(_task: Task): string {
-    // Task.dependsOn contains task IDs; the deliverables are already on the task.
-    // The swarm can enrich task.description with dependency context before calling execute().
+  private _buildDependencyContext(task: Task): string {
+    // Check if the swarm injected dependency context onto the task
+    const injected = (task as unknown as Record<string, unknown>)._dependencyContext;
+    if (typeof injected === 'string' && injected.length > 0) return injected;
     return '';
   }
 
