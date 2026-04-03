@@ -55,7 +55,7 @@ function resolveConfig(explicit: BridgeServerConfig = {}): Required<BridgeServer
     path: explicit.path ?? env.BRIDGE_PATH ?? '/',
     healthPort:
       explicit.healthPort ??
-      (env.BRIDGE_HEALTH_PORT ? Number(env.BRIDGE_HEALTH_PORT) : undefined),
+      (env.BRIDGE_HEALTH_PORT ? Number(env.BRIDGE_HEALTH_PORT) : (explicit.port ?? (env.BRIDGE_PORT ? Number(env.BRIDGE_PORT) : DEFAULT_PORT)) + 1),
   };
 }
 
@@ -153,7 +153,7 @@ export class BridgeServer extends (EventEmitter as new () => EventEmitter<Bridge
 
     // Send close frames to all clients
     const closePromises: Promise<void>[] = [];
-    for (const [id, { socket }] of this.clients) {
+    for (const [_id, { socket }] of this.clients) {
       closePromises.push(
         new Promise<void>((res) => {
           const onClose = () => res();
@@ -174,7 +174,7 @@ export class BridgeServer extends (EventEmitter as new () => EventEmitter<Bridge
     ]);
 
     // Force-terminate any lingering sockets
-    for (const [id, { socket }] of this.clients) {
+    for (const [_id, { socket }] of this.clients) {
       try {
         socket.terminate();
       } catch {
