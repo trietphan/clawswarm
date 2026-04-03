@@ -113,6 +113,8 @@ export interface BridgeServerConfig {
   authTokens?: string[];
   /** Path prefix for WebSocket endpoint (default: '/') */
   path?: string;
+  /** Port for the HTTP health endpoint (default: port + 1, or BRIDGE_HEALTH_PORT env) */
+  healthPort?: number;
 }
 
 // ─── Events ───────────────────────────────────────────────────────────────────

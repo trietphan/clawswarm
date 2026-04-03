@@ -8,6 +8,7 @@
  * @module @clawswarm/bridge/bridge
  */
 
+import http from 'node:http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
 import EventEmitter from 'eventemitter3';
@@ -25,6 +26,38 @@ const DEFAULT_PORT = 8787;
 const DEFAULT_HOST = '0.0.0.0';
 const DEFAULT_MAX_CONNECTIONS = 1000;
 const DEFAULT_PING_INTERVAL_MS = 30_000;
+const GRACEFUL_SHUTDOWN_TIMEOUT_MS = 10_000;
+
+// ─── Environment-driven config helpers ────────────────────────────────────────
+
+/**
+ * Build a BridgeServerConfig by merging explicit values with environment
+ * variables.  Env vars use the `BRIDGE_` prefix:
+ *
+ *   BRIDGE_PORT, BRIDGE_HOST, BRIDGE_MAX_CONNECTIONS, BRIDGE_PING_INTERVAL_MS,
+ *   BRIDGE_AUTH_TOKENS (comma-separated), BRIDGE_PATH,
+ *   BRIDGE_HEALTH_PORT (separate HTTP port for /health, defaults to BRIDGE_PORT + 1)
+ */
+function resolveConfig(explicit: BridgeServerConfig = {}): Required<BridgeServerConfig> {
+  const env = process.env;
+  return {
+    port: explicit.port ?? (env.BRIDGE_PORT ? Number(env.BRIDGE_PORT) : DEFAULT_PORT),
+    host: explicit.host ?? env.BRIDGE_HOST ?? DEFAULT_HOST,
+    maxConnections:
+      explicit.maxConnections ??
+      (env.BRIDGE_MAX_CONNECTIONS ? Number(env.BRIDGE_MAX_CONNECTIONS) : DEFAULT_MAX_CONNECTIONS),
+    pingIntervalMs:
+      explicit.pingIntervalMs ??
+      (env.BRIDGE_PING_INTERVAL_MS ? Number(env.BRIDGE_PING_INTERVAL_MS) : DEFAULT_PING_INTERVAL_MS),
+    authTokens:
+      explicit.authTokens ??
+      (env.BRIDGE_AUTH_TOKENS ? env.BRIDGE_AUTH_TOKENS.split(',').map(t => t.trim()).filter(Boolean) : []),
+    path: explicit.path ?? env.BRIDGE_PATH ?? '/',
+    healthPort:
+      explicit.healthPort ??
+      (env.BRIDGE_HEALTH_PORT ? Number(env.BRIDGE_HEALTH_PORT) : undefined),
+  };
+}
 
 // ─── BridgeServer ─────────────────────────────────────────────────────────────
 
@@ -49,25 +82,22 @@ const DEFAULT_PING_INTERVAL_MS = 30_000;
 export class BridgeServer extends (EventEmitter as new () => EventEmitter<BridgeServerEvents>) {
   private readonly config: Required<BridgeServerConfig>;
   private wss: WebSocketServer | null = null;
+  private httpServer: http.Server | null = null;
   private clients: Map<string, { client: BridgeClient; socket: WebSocket }> = new Map();
   private pingTimer: ReturnType<typeof setInterval> | null = null;
+  private _shuttingDown = false;
+  private _signalHandlers: { signal: NodeJS.Signals; handler: () => void }[] = [];
 
   constructor(config: BridgeServerConfig = {}) {
     super();
-    this.config = {
-      port: config.port ?? DEFAULT_PORT,
-      host: config.host ?? DEFAULT_HOST,
-      maxConnections: config.maxConnections ?? DEFAULT_MAX_CONNECTIONS,
-      pingIntervalMs: config.pingIntervalMs ?? DEFAULT_PING_INTERVAL_MS,
-      authTokens: config.authTokens ?? [],
-      path: config.path ?? '/',
-    };
+    this.config = resolveConfig(config);
   }
 
   // ─── Public API ───────────────────────────────────────────────────────────
 
   /**
-   * Start the WebSocket server.
+   * Start the WebSocket server and HTTP health endpoint.
+   * Also registers SIGTERM/SIGINT handlers for graceful shutdown.
    * Returns a promise that resolves once the server is listening.
    */
   async start(): Promise<void> {
@@ -88,6 +118,8 @@ export class BridgeServer extends (EventEmitter as new () => EventEmitter<Bridge
 
       this.wss.on('listening', () => {
         this._startPingTimer();
+        this._registerSignalHandlers();
+        this._startHealthServer();
         this.emit('listening', this.config.port, this.config.host);
         resolve();
       });
@@ -95,25 +127,73 @@ export class BridgeServer extends (EventEmitter as new () => EventEmitter<Bridge
   }
 
   /**
-   * Stop the WebSocket server and disconnect all clients.
+   * Gracefully stop the WebSocket server.
+   *
+   * 1. Stops accepting new connections.
+   * 2. Sends close frames to every connected client and waits for them
+   *    to drain (up to GRACEFUL_SHUTDOWN_TIMEOUT_MS).
+   * 3. Forcefully terminates any remaining sockets.
+   * 4. Cleans up timers and the health HTTP server.
    */
   async stop(): Promise<void> {
-    if (!this.wss) return;
+    if (!this.wss || this._shuttingDown) return;
+    this._shuttingDown = true;
 
+    // Stop ping timer
     if (this.pingTimer) {
       clearInterval(this.pingTimer);
       this.pingTimer = null;
     }
 
-    // Close all client connections
+    // Unregister signal handlers so we don't double-fire
+    for (const { signal, handler } of this._signalHandlers) {
+      process.removeListener(signal, handler);
+    }
+    this._signalHandlers = [];
+
+    // Send close frames to all clients
+    const closePromises: Promise<void>[] = [];
     for (const [id, { socket }] of this.clients) {
-      socket.close(1001, 'Server shutting down');
-      this.clients.delete(id);
+      closePromises.push(
+        new Promise<void>((res) => {
+          const onClose = () => res();
+          socket.once('close', onClose);
+          try {
+            socket.close(1001, 'Server shutting down');
+          } catch {
+            res();
+          }
+        })
+      );
     }
 
-    return new Promise((resolve) => {
+    // Wait for clients to close or timeout
+    await Promise.race([
+      Promise.allSettled(closePromises),
+      new Promise<void>((r) => setTimeout(r, GRACEFUL_SHUTDOWN_TIMEOUT_MS)),
+    ]);
+
+    // Force-terminate any lingering sockets
+    for (const [id, { socket }] of this.clients) {
+      try {
+        socket.terminate();
+      } catch {
+        // already gone
+      }
+    }
+    this.clients.clear();
+
+    // Close health HTTP server
+    if (this.httpServer) {
+      await new Promise<void>((res) => this.httpServer!.close(() => res()));
+      this.httpServer = null;
+    }
+
+    // Close WSS
+    await new Promise<void>((resolve) => {
       this.wss!.close(() => {
         this.wss = null;
+        this._shuttingDown = false;
         resolve();
       });
     });
@@ -157,8 +237,12 @@ export class BridgeServer extends (EventEmitter as new () => EventEmitter<Bridge
       if (roles && !roles.includes(client.role)) continue;
       if (!client.authenticated) continue;
 
-      socket.send(JSON.stringify(message));
-      count++;
+      try {
+        socket.send(JSON.stringify(message));
+        count++;
+      } catch {
+        // Skip failed sends silently — the client will be cleaned up on close/error
+      }
     }
     return count;
   }
@@ -189,7 +273,13 @@ export class BridgeServer extends (EventEmitter as new () => EventEmitter<Bridge
    * Handle a new WebSocket connection.
    * @internal
    */
-  private _onConnection(socket: WebSocket, _req: import('http').IncomingMessage): void {
+  private _onConnection(socket: WebSocket, _req: http.IncomingMessage): void {
+    // Reject new connections during shutdown
+    if (this._shuttingDown) {
+      socket.close(1001, 'Server shutting down');
+      return;
+    }
+
     if (this.clients.size >= this.config.maxConnections) {
       socket.close(1013, 'Server at capacity');
       return;
@@ -208,9 +298,35 @@ export class BridgeServer extends (EventEmitter as new () => EventEmitter<Bridge
     this.clients.set(clientId, { client, socket });
     this.emit('client:connected', client);
 
-    socket.on('message', (data) => this._onMessage(clientId, data));
-    socket.on('close', (code, reason) => this._onClose(clientId, code, reason.toString()));
-    socket.on('error', (err) => this.emit('error', err));
+    socket.on('message', (data) => {
+      try {
+        this._onMessage(clientId, data);
+      } catch (err) {
+        this.emit('error', err instanceof Error ? err : new Error(String(err)));
+        this.send(clientId, this._errorMessage('INTERNAL_ERROR', 'Unexpected error processing message'));
+      }
+    });
+
+    socket.on('close', (code, reason) => {
+      try {
+        this._onClose(clientId, code, reason.toString());
+      } catch {
+        // Ensure close never throws
+        this.clients.delete(clientId);
+      }
+    });
+
+    socket.on('error', (err) => {
+      this.emit('error', err);
+      // Clean up on socket error to prevent leaks
+      try {
+        socket.terminate();
+      } catch {
+        // ignore
+      }
+      this.clients.delete(clientId);
+    });
+
     socket.on('pong', () => {
       const entry = this.clients.get(clientId);
       if (entry) entry.client.lastPingAt = new Date().toISOString();
@@ -225,11 +341,24 @@ export class BridgeServer extends (EventEmitter as new () => EventEmitter<Bridge
     const entry = this.clients.get(clientId);
     if (!entry) return;
 
+    // Guard against oversized messages (1 MB limit)
+    const raw = data.toString();
+    if (raw.length > 1_048_576) {
+      this.send(clientId, this._errorMessage('MESSAGE_TOO_LARGE', 'Message exceeds 1 MB limit'));
+      return;
+    }
+
     let message: BridgeMessage;
     try {
-      message = JSON.parse(data.toString()) as BridgeMessage;
+      message = JSON.parse(raw) as BridgeMessage;
     } catch {
       this.send(clientId, this._errorMessage('PARSE_ERROR', 'Invalid JSON'));
+      return;
+    }
+
+    // Validate message shape
+    if (!message || typeof message.type !== 'string') {
+      this.send(clientId, this._errorMessage('INVALID_MESSAGE', 'Missing or invalid "type" field'));
       return;
     }
 
@@ -262,7 +391,22 @@ export class BridgeServer extends (EventEmitter as new () => EventEmitter<Bridge
     const entry = this.clients.get(clientId);
     if (!entry) return;
 
+    // Validate auth payload shape
+    if (!payload || typeof payload.token !== 'string' || typeof payload.orgId !== 'string' || typeof payload.role !== 'string') {
+      this.send(clientId, this._errorMessage('INVALID_AUTH', 'Auth payload must include token, orgId, and role'));
+      entry.socket.close(1008, 'Invalid auth payload');
+      return;
+    }
+
     const { token, orgId, role, metadata } = payload;
+
+    // Validate role
+    const validRoles: string[] = ['agent', 'dashboard', 'external'];
+    if (!validRoles.includes(role)) {
+      this.send(clientId, this._errorMessage('INVALID_ROLE', `Role must be one of: ${validRoles.join(', ')}`));
+      entry.socket.close(1008, 'Invalid role');
+      return;
+    }
 
     // Validate token if auth is configured
     if (
@@ -318,7 +462,13 @@ export class BridgeServer extends (EventEmitter as new () => EventEmitter<Bridge
       const now = new Date().toISOString();
       for (const [id, { socket, client }] of this.clients) {
         if (socket.readyState === WebSocket.OPEN) {
-          socket.ping();
+          try {
+            socket.ping();
+          } catch {
+            // Ping failed — clean up
+            this.clients.delete(id);
+            try { socket.terminate(); } catch { /* noop */ }
+          }
           client.lastPingAt = now;
         } else {
           // Clean up stale connections
@@ -326,5 +476,57 @@ export class BridgeServer extends (EventEmitter as new () => EventEmitter<Bridge
         }
       }
     }, this.config.pingIntervalMs);
+  }
+
+  /**
+   * Register SIGTERM/SIGINT handlers for graceful shutdown.
+   * @internal
+   */
+  private _registerSignalHandlers(): void {
+    const handle = (signal: NodeJS.Signals) => {
+      const handler = () => {
+        this.stop().catch((err) => {
+          this.emit('error', err instanceof Error ? err : new Error(String(err)));
+        });
+      };
+      process.on(signal, handler);
+      this._signalHandlers.push({ signal, handler });
+    };
+    handle('SIGTERM');
+    handle('SIGINT');
+  }
+
+  /**
+   * Start a lightweight HTTP server for /health checks.
+   *
+   * By default it uses the WS port + 1, but can be overridden via
+   * `healthPort` config or `BRIDGE_HEALTH_PORT` env var.
+   *
+   * @internal
+   */
+  private _startHealthServer(): void {
+    const port = this.config.healthPort ?? this.config.port + 1;
+    this.httpServer = http.createServer((req, res) => {
+      if (req.method === 'GET' && (req.url === '/health' || req.url === '/healthz')) {
+        const s = this.stats();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          status: 'ok',
+          connections: s.connections,
+          orgs: s.orgs,
+          uptime: s.uptime,
+        }));
+      } else {
+        res.writeHead(404);
+        res.end('Not found');
+      }
+    });
+
+    this.httpServer.on('error', (err) => {
+      // Non-fatal: log but don't crash
+      this.emit('error', err);
+    });
+
+    this.httpServer.listen(port, this.config.host);
   }
 }
