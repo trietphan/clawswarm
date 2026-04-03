@@ -149,12 +149,11 @@ describe('Agent — canHandle()', () => {
 });
 
 describe('Agent — execute()', () => {
-  it('throws with helpful message when not overridden', async () => {
+  it('throws with helpful message when no API key is set', async () => {
     const agent = new Agent(makeConfig({ type: 'code', name: 'TestAgent' }));
     const fakeTask = { id: 'task-xyz', title: 'something' } as unknown as Task;
-    await expect(agent.execute(fakeTask)).rejects.toThrow(/must be implemented/i);
+    // Without API keys, execute() throws a provider error containing the agent name
     await expect(agent.execute(fakeTask)).rejects.toThrow('TestAgent');
-    await expect(agent.execute(fakeTask)).rejects.toThrow('task-xyz');
   });
 
   it('subclass can override execute to return deliverables', async () => {

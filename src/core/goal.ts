@@ -5,6 +5,7 @@
 
 import { Goal, GoalStatus, CreateGoalInput, Task, AgentType, SwarmConfig } from './types.js';
 import { TaskManager } from './task.js';
+import { createProvider } from './providers/index.js';
 
 // ─── Goal Planner ─────────────────────────────────────────────────────────────
 
@@ -52,13 +53,114 @@ export class GoalPlanner {
   }
 
   /**
-   * Generate a task plan for a goal.
-   * In production, this calls an LLM with the planner system prompt.
-   * Returns structured step definitions.
+   * Generate a task plan for a goal using an LLM.
+   * Falls back to a basic 3-step plan if LLM call fails.
    */
   private async _generatePlan(goal: Goal): Promise<PlanStep[]> {
-    // TODO: Replace with actual LLM call
-    // This stub returns a basic 3-step plan as an example
+    // Determine planner model — try each agent model in order until one works
+    const candidateModels = [
+      this.config.agents[0]?.model ?? 'gemini-pro',
+      ...this.config.agents.slice(1).map(a => a.model),
+    ];
+
+    // Also add default fallback models based on available API keys
+    if (process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY) {
+      candidateModels.push('gemini-pro');
+    }
+    if (process.env.ANTHROPIC_API_KEY) {
+      candidateModels.push('claude-sonnet-4');
+    }
+    if (process.env.OPENAI_API_KEY) {
+      candidateModels.push('gpt-4o');
+    }
+
+    const plannerModel = candidateModels[0] ?? 'gemini-pro';
+
+    try {
+      // Try to find a working provider
+      let provider;
+      for (const model of candidateModels) {
+        try {
+          provider = await createProvider(model);
+          break;
+        } catch {
+          // Try next model
+        }
+      }
+      if (!provider) {
+        throw new Error('No working LLM provider found for planning');
+      }
+
+      const systemPrompt = `You are a goal planner for an AI agent system called ClawSwarm.
+Your job is to break down a high-level goal into 2-5 concrete, actionable tasks.
+Each task should be assigned to the most appropriate specialist agent type.
+
+Available agent types:
+- research: Information gathering, analysis, written reports
+- code: Writing, reviewing, debugging code
+- ops: Infrastructure, deployment, monitoring
+- planner: High-level planning and coordination
+
+Rules:
+1. Generate 2-5 tasks (not more)
+2. Tasks should build on each other logically
+3. Specify dependencies where needed
+4. Be specific in task descriptions
+
+Respond ONLY with valid JSON matching this exact schema:
+{
+  "tasks": [
+    {
+      "title": "Short task title",
+      "description": "Detailed description of what to do",
+      "agentType": "research|code|ops|planner",
+      "dependsOnTitles": ["Title of task this depends on"] // optional, omit if no dependencies
+    }
+  ]
+}`;
+
+      const userPrompt = `Decompose this goal into tasks:
+
+Goal: ${goal.title}
+Description: ${goal.description}
+
+Generate a task plan as JSON.`;
+
+      const response = await provider.chat(
+        [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        { responseFormat: 'json', temperature: 0.3 }
+      );
+
+      const parsed = JSON.parse(response.content);
+      if (Array.isArray(parsed.tasks) && parsed.tasks.length > 0) {
+        return parsed.tasks.map((t: {
+          title: string;
+          description: string;
+          agentType: string;
+          dependsOnTitles?: string[];
+        }) => ({
+          title: t.title,
+          description: t.description,
+          agentType: (t.agentType as AgentType) ?? this._inferPrimaryAgent(goal),
+          dependsOnTitles: t.dependsOnTitles,
+        }));
+      }
+    } catch (err) {
+      // LLM planning failed — fall back to stub
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[GoalPlanner] LLM planning failed, using fallback plan: ${msg}`);
+    }
+
+    return this._fallbackPlan(goal);
+  }
+
+  /**
+   * Fallback: basic 3-step plan when LLM is unavailable.
+   */
+  private _fallbackPlan(goal: Goal): PlanStep[] {
     return [
       {
         title: `Research: ${goal.title}`,

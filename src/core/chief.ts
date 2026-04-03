@@ -16,6 +16,7 @@ import {
   ChiefReviewConfig,
   ModelId,
 } from './types.js';
+import { createProvider } from './providers/index.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -163,25 +164,48 @@ Respond in JSON:
   }
 
   /**
-   * Call the LLM reviewer. In production, replace the stub with a real LLM call.
+   * Call the LLM reviewer. Falls back to heuristics if LLM is unavailable.
    * @internal
    */
   private async _callReviewerLLM(task: Task): Promise<RawReviewResponse> {
-    // ── Production stub ──────────────────────────────────────────────────────
-    // Replace this with your actual LLM client call, e.g.:
-    //
-    //   const response = await openai.chat.completions.create({
-    //     model: this.reviewerModel,
-    //     messages: [{ role: 'user', content: this._buildPrompt(task) }],
-    //     response_format: { type: 'json_object' },
-    //   });
-    //   return JSON.parse(response.choices[0].message.content!);
-    //
-    // ────────────────────────────────────────────────────────────────────────
+    const prompt = this._buildPrompt(task);
 
-    void this._buildPrompt(task); // reference so it's not dead code
+    try {
+      const provider = await createProvider(this.reviewerModel);
+      const response = await provider.chat(
+        [{ role: 'user', content: prompt }],
+        { responseFormat: 'json', temperature: 0.2 }
+      );
 
-    // Stub: evaluate based on deliverable completeness heuristics
+      const parsed = JSON.parse(response.content);
+
+      // Normalize parsed response
+      const score = typeof parsed.overallScore === 'number'
+        ? parsed.overallScore
+        : typeof parsed.score === 'number'
+          ? parsed.score
+          : 5;
+
+      return {
+        score,
+        issues: Array.isArray(parsed.issues) ? parsed.issues : [],
+        suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions : [],
+        feedback: typeof parsed.feedback === 'string' ? parsed.feedback : 'Review completed.',
+      };
+    } catch (err) {
+      // LLM review failed — fall back to heuristics
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[ChiefReviewer] LLM review failed, using heuristics: ${msg}`);
+    }
+
+    return this._heuristicReview(task);
+  }
+
+  /**
+   * Heuristic fallback reviewer when LLM is unavailable.
+   * @internal
+   */
+  private _heuristicReview(task: Task): RawReviewResponse {
     const hasContent = task.deliverables.some(d => d.content.trim().length > 100);
     const hasTodo = task.deliverables.some(d => /TODO|FIXME|placeholder/i.test(d.content));
     const hasCode = task.deliverables.some(d => d.type === 'code');

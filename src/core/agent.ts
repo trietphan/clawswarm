@@ -4,6 +4,8 @@
  */
 
 import { AgentConfig, AgentStatus, AgentType, ModelId, Task, Deliverable } from './types.js';
+import { createProvider } from './providers/index.js';
+import type { LLMProvider } from './providers/types.js';
 
 // ─── Agent Base Class ─────────────────────────────────────────────────────────
 
@@ -44,13 +46,59 @@ export class Agent {
 
   /**
    * Execute a task and return deliverables.
-   * Override this in custom agents.
+   * Uses the configured LLM provider to complete the task.
    *
    * @param task - The task to execute
    * @returns Array of deliverables produced
    */
   async execute(task: Task): Promise<Deliverable[]> {
-    throw new Error(`Agent.execute() must be implemented. Agent: ${this.name}, Task: ${task.id}`);
+    let provider: LLMProvider;
+    try {
+      provider = await createProvider(this.config.model);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`Agent "${this.name}" cannot create LLM provider for model "${this.config.model}": ${msg}`);
+    }
+
+    // Build context from dependency outputs (if any)
+    const dependencyContext = this._buildDependencyContext(task);
+
+    // Build messages
+    const messages = [
+      {
+        role: 'system' as const,
+        content: this.getSystemPrompt(),
+      },
+      {
+        role: 'user' as const,
+        content: this._buildUserPrompt(task, dependencyContext),
+      },
+    ];
+
+    let response;
+    try {
+      response = await provider.chat(messages, {
+        model: this.config.model,
+        temperature: this.config.temperature ?? 0.7,
+        maxTokens: this.config.maxTokens ?? 8192,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`Agent "${this.name}" LLM call failed for task "${task.title}": ${msg}`);
+    }
+
+    const content = response.content.trim();
+
+    // Determine deliverable type based on agent type
+    const deliverableType = this._inferDeliverableType(content);
+
+    return [
+      {
+        type: deliverableType,
+        label: `${this.name} — ${task.title}`,
+        content,
+      },
+    ];
   }
 
   /**
@@ -124,6 +172,37 @@ export class Agent {
   }
 
   // ─── Private Helpers ─────────────────────────────────────────────────────────
+
+  private _buildUserPrompt(task: Task, dependencyContext: string): string {
+    const parts: string[] = [
+      `Task: ${task.title}`,
+      `Description: ${task.description}`,
+    ];
+
+    if (dependencyContext) {
+      parts.push('');
+      parts.push('## Context from previous tasks:');
+      parts.push(dependencyContext);
+    }
+
+    parts.push('');
+    parts.push('Please complete this task thoroughly and provide your full output.');
+
+    return parts.join('\n');
+  }
+
+  private _buildDependencyContext(_task: Task): string {
+    // Task.dependsOn contains task IDs; the deliverables are already on the task.
+    // The swarm can enrich task.description with dependency context before calling execute().
+    return '';
+  }
+
+  private _inferDeliverableType(content: string): Deliverable['type'] {
+    if (this.config.type === 'code') return 'code';
+    // Detect code blocks
+    if (/```[\w]*\n/.test(content) && this.config.type !== 'research') return 'code';
+    return 'text';
+  }
 
   private _defaultName(type: AgentType): string {
     const names: Record<AgentType, string> = {

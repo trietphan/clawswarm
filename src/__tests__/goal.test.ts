@@ -4,10 +4,13 @@
  * error handling, and GoalPlanner decomposition logic.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterAll, beforeAll } from 'vitest';
 import { GoalManager, GoalPlanner } from '../core/goal.js';
 import { TaskManager } from '../core/task.js';
 import type { GoalStatus, CreateGoalInput } from '../core/types.js';
+
+// Save and clear API keys so planner uses fallback stub (no real LLM calls in tests)
+const savedEnv: Record<string, string | undefined> = {};
 
 // ─── GoalManager Tests ────────────────────────────────────────────────────────
 
@@ -178,6 +181,20 @@ describe('GoalPlanner — decompose', () => {
   let planner: GoalPlanner;
   let tm: TaskManager;
   let gm: GoalManager;
+
+  beforeAll(() => {
+    for (const key of ['GEMINI_API_KEY', 'GOOGLE_AI_API_KEY', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY']) {
+      savedEnv[key] = process.env[key];
+      delete process.env[key];
+    }
+  });
+
+  afterAll(() => {
+    for (const [key, val] of Object.entries(savedEnv)) {
+      if (val !== undefined) process.env[key] = val;
+      else delete process.env[key];
+    }
+  });
 
   beforeEach(() => {
     planner = new GoalPlanner({

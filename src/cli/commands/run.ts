@@ -8,6 +8,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ClawSwarm } from '../../core/clawswarm.js';
 import { Agent } from '../../core/agent.js';
+import { availableProviders, detectProviderName } from '../../core/providers/index.js';
 import type { SwarmConfig, Goal, Task, AgentType } from '../../core/types.js';
 import type { ReviewResult } from '../../core/types.js';
 
@@ -22,17 +23,47 @@ export interface RunOptions {
 
 // ─── Defaults ─────────────────────────────────────────────────────────────────
 
-const DEFAULT_CONFIG: SwarmConfig = {
-  agents: [
-    Agent.research({ model: 'claude-sonnet-4' }),
-    Agent.code({ model: 'gpt-4o' }),
-    Agent.ops({ model: 'gemini-pro' }),
-  ],
-  chiefReview: {
-    autoApproveThreshold: 8,
-    humanReviewThreshold: 5,
-  },
-};
+function buildDefaultConfig(): SwarmConfig {
+  // Auto-select model based on available API keys
+  const hasGemini = !!(process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY);
+  const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
+  const hasOpenAI = !!process.env.OPENAI_API_KEY;
+
+  let researchModel = 'gemini-pro';
+  let codeModel = 'gemini-pro';
+  let opsModel = 'gemini-pro';
+
+  if (hasAnthropic) researchModel = 'claude-sonnet-4';
+  else if (hasGemini) researchModel = 'gemini-pro';
+  else if (hasOpenAI) researchModel = 'gpt-4o';
+
+  if (hasOpenAI) codeModel = 'gpt-4o';
+  else if (hasGemini) codeModel = 'gemini-pro';
+  else if (hasAnthropic) codeModel = 'claude-sonnet-4';
+
+  if (hasGemini) opsModel = 'gemini-pro';
+  else if (hasAnthropic) opsModel = 'claude-sonnet-4';
+  else if (hasOpenAI) opsModel = 'gpt-4o';
+
+  return {
+    agents: [
+      Agent.research({ model: researchModel }),
+      Agent.code({ model: codeModel }),
+      Agent.ops({ model: opsModel }),
+    ],
+    chiefReview: {
+      autoApproveThreshold: 8,
+      humanReviewThreshold: 5,
+    },
+  };
+}
+
+// Lazily evaluated so env vars are read at execution time
+let _defaultConfig: SwarmConfig | null = null;
+function getDefaultConfig(): SwarmConfig {
+  if (!_defaultConfig) _defaultConfig = buildDefaultConfig();
+  return _defaultConfig;
+}
 
 // ─── Run Command ──────────────────────────────────────────────────────────────
 
@@ -52,8 +83,30 @@ export async function runGoal(goalDescription: string, options: RunOptions = {})
   console.log('\n🐾 ClawSwarm — Running Goal\n');
   console.log(`  📌 Goal: ${goalDescription}\n`);
 
+  // Check API keys before loading config
+  const providers = availableProviders();
+  if (providers.length === 0) {
+    console.error('❌ No LLM API keys found!\n');
+    console.error('   ClawSwarm needs at least one of:');
+    console.error('     GEMINI_API_KEY or GOOGLE_AI_API_KEY  (Google Gemini)');
+    console.error('     ANTHROPIC_API_KEY                    (Anthropic Claude)');
+    console.error('     OPENAI_API_KEY                       (OpenAI GPT)\n');
+    console.error('   Example:');
+    console.error('     GEMINI_API_KEY=your-key clawswarm run "your goal"');
+    process.exit(1);
+  }
+
+  console.log(`  🔑 Active providers: ${providers.join(', ')}`);
+
   // Load config
   const config = await loadConfig(options.config);
+
+  // Show which provider/model each agent will use
+  for (const agent of config.agents) {
+    const providerName = detectProviderName(agent.model);
+    console.log(`  🤖 ${agent.name ?? agent.type} → ${agent.model} (${providerName})`);
+  }
+  console.log();
 
   // Create swarm
   const swarm = new ClawSwarm(config);
@@ -67,8 +120,7 @@ export async function runGoal(goalDescription: string, options: RunOptions = {})
     description: goalDescription,
   });
 
-  console.log(`  🆔 Goal ID: ${goal.id}`);
-  console.log(`  🤖 Agents: ${config.agents.map(a => a.name ?? a.type).join(', ')}\n`);
+  console.log(`  🆔 Goal ID: ${goal.id}\n`);
 
   const startTime = Date.now();
 
@@ -118,6 +170,16 @@ export async function runGoal(goalDescription: string, options: RunOptions = {})
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
     console.error('\n❌ Goal failed:', err.message);
+
+    // Helpful hints for common failures
+    if (err.message.includes('API key') || err.message.includes('GEMINI_API_KEY') || err.message.includes('ANTHROPIC_API_KEY') || err.message.includes('OPENAI_API_KEY')) {
+      console.error('\n   💡 Tip: Set an API key, e.g.:');
+      console.error('     GEMINI_API_KEY=your-key clawswarm run "your goal"');
+    }
+    if (err.message.includes('provider') || err.message.includes('Cannot determine')) {
+      console.error('\n   💡 Tip: Use a recognized model name like gemini-pro, claude-sonnet-4, or gpt-4o');
+    }
+
     if (options.verbose && err.stack) {
       console.error('\n' + err.stack);
     }
@@ -152,7 +214,7 @@ async function loadConfig(configPath?: string): Promise<SwarmConfig> {
 
   // Use defaults
   console.log('  ⚙  Using default config (no clawswarm.config.ts found)');
-  return DEFAULT_CONFIG;
+  return getDefaultConfig();
 }
 
 // ─── Event Listeners ──────────────────────────────────────────────────────────
