@@ -18,6 +18,10 @@ export { GoalManager, GoalPlanner } from './core/goal.js';
 export { TaskManager } from './core/task.js';
 export { ChiefReviewer } from './core/chief.js';
 
+// ─── Utilities ────────────────────────────────────────────────────────────────
+export { withTimeout, withRetry, LLMTimeoutError, ResultStore } from './core/utils/index.js';
+export type { PersistedTaskState, PersistedGoalState } from './core/utils/index.js';
+
 // ─── Bridge ───────────────────────────────────────────────────────────────────
 export { BridgeServer } from './bridge/bridge.js';
 export { ConvexBridgeAdapter } from './bridge/convex-adapter.js';

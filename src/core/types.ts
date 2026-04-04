@@ -170,6 +170,11 @@ export interface ChiefReviewConfig {
   reviewerModel?: ModelId;
   /** Custom review criteria */
   criteria?: string[];
+  /**
+   * Maximum rework cycles before escalating to human review instead of
+   * looping forever. Default: 2.
+   */
+  maxReworkCycles?: number;
 }
 
 // ─── Cost Tracking ────────────────────────────────────────────────────────────

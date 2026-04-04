@@ -13,6 +13,8 @@ export interface ChatOptions {
   temperature?: number;
   maxTokens?: number;
   responseFormat?: 'text' | 'json';
+  /** Milliseconds before the LLM call is aborted (default: 120_000) */
+  timeoutMs?: number;
 }
 
 export interface ChatResponse {

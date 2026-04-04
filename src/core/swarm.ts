@@ -198,19 +198,38 @@ export class ClawSwarm extends EventEmitter<SwarmEvents> {
           this.taskManager.complete(task.id);
           approved = true;
         } else {
-          // Rejected — attempt rework
+          // Rejected — attempt rework or escalate via circuit breaker
           this.emit('task:rejected', updatedTask, review);
-          try {
-            this.taskManager.rework(task.id, review.feedback);
-            this.emit('task:rework', updatedTask, review);
-            // Re-run with agent
-            const reworkDeliverables = await agent.execute(updatedTask);
-            this.taskManager.submitForReview(task.id, reworkDeliverables);
-          } catch {
-            // Max rework exceeded
-            this.taskManager.reject(task.id, review.feedback);
-            this.emit('task:failed', updatedTask, new Error('Max rework cycles exceeded'));
-            approved = true; // exit loop
+
+          const currentTask = this.taskManager.get(task.id)!;
+          const maxRework = this.config.chiefReview?.maxReworkCycles ?? 2;
+
+          if (currentTask.reworkCount >= maxRework) {
+            // ── Circuit Breaker: escalate to human review instead of looping ──
+            hadHumanReview = true;
+            const escalationReview = {
+              ...review,
+              decision: 'human_review' as const,
+              feedback: `Circuit breaker: escalated to human review after ${currentTask.reworkCount} rework cycle(s). Last feedback: ${review.feedback}`,
+            };
+            this.emit('human:review_required', updatedTask, escalationReview);
+            // Auto-approve escalated tasks (human notified via event)
+            this.taskManager.approve(task.id);
+            this.taskManager.complete(task.id);
+            approved = true;
+          } else {
+            try {
+              this.taskManager.rework(task.id, review.feedback);
+              this.emit('task:rework', updatedTask, review);
+              // Re-run with agent
+              const reworkDeliverables = await agent.execute(updatedTask);
+              this.taskManager.submitForReview(task.id, reworkDeliverables);
+            } catch {
+              // TaskManager.rework() threw (maxReworkCycles on the task itself)
+              this.taskManager.reject(task.id, review.feedback);
+              this.emit('task:failed', updatedTask, new Error('Max rework cycles exceeded'));
+              approved = true; // exit loop
+            }
           }
         }
       }

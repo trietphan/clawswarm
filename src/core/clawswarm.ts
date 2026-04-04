@@ -270,6 +270,28 @@ export class ClawSwarm extends EventEmitter<SwarmEvents> {
       case 'rejected': {
         this.emit('task:rejected', task, review);
 
+        // ── Circuit Breaker ──────────────────────────────────────────────────
+        // If reworkCount has reached maxReworkCycles (from config or task),
+        // escalate to human review instead of looping forever.
+        const currentTask = this.taskManager.get(task.id)!;
+        const maxRework = this.config.chiefReview?.maxReworkCycles ?? 2;
+
+        if (currentTask.reworkCount >= maxRework) {
+          const escalationReview: ReviewResult = {
+            ...review,
+            decision: 'human_review',
+            feedback:
+              `Circuit breaker triggered: escalated to human review after ` +
+              `${currentTask.reworkCount} rework cycle(s). ` +
+              `Last feedback: ${review.feedback}`,
+          };
+          this.emit('human:review_required', currentTask, escalationReview);
+          // Auto-approve escalated task so pipeline keeps moving
+          this.taskManager.approve(task.id);
+          this.taskManager.complete(task.id);
+          break;
+        }
+
         try {
           // Attempt rework
           this.taskManager.rework(task.id, review.feedback);
@@ -278,7 +300,7 @@ export class ClawSwarm extends EventEmitter<SwarmEvents> {
           const updatedTask = this.taskManager.get(task.id)!;
           await this._executeTask(updatedTask);
         } catch {
-          // Max rework exceeded — fail the task
+          // TaskManager.rework() threw (its own maxReworkCycles guard) — reject
           this.taskManager.reject(task.id, review.feedback);
         }
         break;

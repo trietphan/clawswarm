@@ -119,6 +119,7 @@ export class ChiefReviewer extends EventEmitter {
       humanReviewThreshold: this.humanReviewThreshold,
       reviewerModel: this.reviewerModel,
       criteria: this.criteria,
+      maxReworkCycles: 2, // stored on tasks, not on the reviewer itself
     };
   }
 

@@ -5,6 +5,9 @@
  */
 
 import { LLMProvider, ChatMessage, ChatOptions, ChatResponse } from './types.js';
+import { withTimeout } from '../utils/timeout.js';
+
+const DEFAULT_TIMEOUT_MS = 120_000;
 
 // Model name mappings
 const MODEL_MAP: Record<string, string> = {
@@ -71,7 +74,13 @@ export class AnthropicProvider implements LLMProvider {
       requestParams.temperature = options.temperature;
     }
 
-    const response = await client.messages.create(requestParams);
+    const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response: any = await withTimeout(
+      client.messages.create(requestParams) as Promise<unknown>,
+      timeoutMs,
+      `AnthropicProvider.chat(${modelName})`
+    );
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const content = (response.content as any[])

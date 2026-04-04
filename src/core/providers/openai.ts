@@ -5,6 +5,9 @@
  */
 
 import { LLMProvider, ChatMessage, ChatOptions, ChatResponse } from './types.js';
+import { withTimeout } from '../utils/timeout.js';
+
+const DEFAULT_TIMEOUT_MS = 120_000;
 
 // Model name mappings
 const MODEL_MAP: Record<string, string> = {
@@ -66,7 +69,13 @@ export class OpenAIProvider implements LLMProvider {
       requestParams.response_format = { type: 'json_object' };
     }
 
-    const response = await client.chat.completions.create(requestParams);
+    const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const response: any = await withTimeout(
+      client.chat.completions.create(requestParams) as Promise<unknown>,
+      timeoutMs,
+      `OpenAIProvider.chat(${modelName})`
+    );
     const choice = response.choices[0];
 
     return {

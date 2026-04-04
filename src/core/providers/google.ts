@@ -4,6 +4,9 @@
  */
 
 import { LLMProvider, ChatMessage, ChatOptions, ChatResponse } from './types.js';
+import { withTimeout } from '../utils/timeout.js';
+
+const DEFAULT_TIMEOUT_MS = 120_000;
 
 // Model name mappings — maps user-facing aliases to actual API model names
 const MODEL_MAP: Record<string, string> = {
@@ -72,7 +75,12 @@ export class GoogleProvider implements LLMProvider {
     });
 
     const chat = modelWithSystem.startChat({ history });
-    const result = await chat.sendMessage(lastMessage.content);
+    const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const result = await withTimeout(
+      chat.sendMessage(lastMessage.content),
+      timeoutMs,
+      `GoogleProvider.chat(${modelName})`
+    );
     const response = result.response;
     const text = response.text();
 
