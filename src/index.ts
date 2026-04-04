@@ -20,6 +20,7 @@ export { ChiefReviewer } from './core/chief.js';
 
 // ─── Bridge ───────────────────────────────────────────────────────────────────
 export { BridgeServer } from './bridge/bridge.js';
+export { ConvexBridgeAdapter } from './bridge/convex-adapter.js';
 export { TaskRouter } from './bridge/router.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -67,4 +68,9 @@ export type {
   ErrorPayload,
   AgentStatusPayload,
   RoutingRule,
+  // Convex adapter types
+  ConvexAdapterConfig,
+  ConvexAdapterEvents,
+  ConvexPendingStep,
+  ConvexStepResult,
 } from './bridge/types.js';
