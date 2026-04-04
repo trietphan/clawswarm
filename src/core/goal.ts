@@ -74,7 +74,10 @@ export class GoalPlanner {
       candidateModels.push('gpt-4o');
     }
 
-    const plannerModel = candidateModels[0] ?? 'gemini-pro';
+    // Ensure at least one fallback model
+    if (candidateModels.length === 0) {
+      candidateModels.push('gemini-pro');
+    }
 
     try {
       // Try to find a working provider
