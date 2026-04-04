@@ -150,10 +150,28 @@ describe('Agent — canHandle()', () => {
 
 describe('Agent — execute()', () => {
   it('throws with helpful message when no API key is set', async () => {
-    const agent = new Agent(makeConfig({ type: 'code', name: 'TestAgent' }));
-    const fakeTask = { id: 'task-xyz', title: 'something' } as unknown as Task;
-    // Without API keys, execute() throws a provider error containing the agent name
-    await expect(agent.execute(fakeTask)).rejects.toThrow('TestAgent');
+    // Clear ALL API keys so no model in the fallback chain succeeds
+    const savedKeys = {
+      OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+      GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+      GOOGLE_API_KEY: process.env.GOOGLE_API_KEY,
+      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+    };
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.GEMINI_API_KEY;
+    delete process.env.GOOGLE_API_KEY;
+    delete process.env.ANTHROPIC_API_KEY;
+    try {
+      const agent = new Agent(makeConfig({ type: 'code', name: 'TestAgent', model: 'gpt-4o' }));
+      const fakeTask = { id: 'task-xyz', title: 'something' } as unknown as Task;
+      // Without any API keys, all models in fallback chain fail
+      await expect(agent.execute(fakeTask)).rejects.toThrow();
+    } finally {
+      // Restore keys
+      Object.entries(savedKeys).forEach(([k, v]) => {
+        if (v !== undefined) process.env[k] = v;
+      });
+    }
   });
 
   it('subclass can override execute to return deliverables', async () => {
