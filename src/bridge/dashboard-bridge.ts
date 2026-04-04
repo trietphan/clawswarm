@@ -269,6 +269,11 @@ export class DashboardBridge {
       title: task.title,
       output: task.deliverables.map(d => d.content).join('\n\n'),
     });
+
+    // Signal agent-done to decrement activeSpawns on the dashboard
+    const ossRole = task.assignedTo ?? 'code';
+    const role = ROLE_MAP[ossRole] ?? ossRole;
+    void this._post('/api/bridge/agent-done', { role }).catch(() => undefined);
   }
 
   private _handleTaskReview(task: Task, review: ReviewResult): void {
@@ -302,13 +307,18 @@ export class DashboardBridge {
     const dashTaskId = this.taskIdMap.get(task.id);
     if (!dashTaskId) return;
 
-    void this._post('/api/bridge/report', {
-      stepId: dashTaskId,
-      status: 'error' as const,
+    // Don't call /api/bridge/report — expects stepId. Use stream events instead.
+    this._queueStreamEvent('task:failed', {
+      taskId: task.id,
+      dashTaskId,
+      title: task.title,
       error: error.message,
-    }).catch(() => undefined);
+    });
 
-    this._queueStreamEvent('task:failed', { taskId: task.id, title: task.title, error: error.message });
+    // Free the agent on failure too
+    const ossRole = task.assignedTo ?? 'code';
+    const role = ROLE_MAP[ossRole] ?? ossRole;
+    void this._post('/api/bridge/agent-done', { role }).catch(() => undefined);
   }
 
   private _handleHumanReviewRequired(task: Task, review: ReviewResult): void {

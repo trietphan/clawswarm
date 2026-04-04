@@ -555,16 +555,22 @@ describe('DashboardBridge', () => {
     await new Promise(r => setTimeout(r, 50));
     fetchMock.mockClear();
 
-    swarm.emit('task:failed', makeTask({ status: 'failed' }), new Error('LLM timeout'));
+    swarm.emit('task:failed', makeTask({ status: 'failed', assignedTo: 'code' }), new Error('LLM timeout'));
     await new Promise(r => setTimeout(r, 50));
 
+    // Should NOT call /api/bridge/report (expects stepId, not taskId)
     const reportCall = fetchMock.mock.calls.find(c =>
       (c[0] as string).includes('/api/bridge/report'),
     );
-    expect(reportCall).toBeDefined();
-    const body = JSON.parse((reportCall![1] as RequestInit).body as string) as Record<string, unknown>;
-    expect(body['status']).toBe('error');
-    expect(body['error']).toBe('LLM timeout');
+    expect(reportCall).toBeUndefined();
+
+    // Should call agent-done to free the agent
+    const doneCall = fetchMock.mock.calls.find(c =>
+      (c[0] as string).includes('/api/bridge/agent-done'),
+    );
+    expect(doneCall).toBeDefined();
+    const doneBody = JSON.parse((doneCall![1] as RequestInit).body as string) as Record<string, unknown>;
+    expect(doneBody['role']).toBe('developer'); // code → developer via ROLE_MAP
 
     bridge.detach();
   });
