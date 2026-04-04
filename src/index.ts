@@ -24,6 +24,20 @@ export type { PersistedTaskState, PersistedGoalState, StoredResult } from './cor
 export { withSmartRetry, isRetryable, chatWithFallback, getFallbackChain, MODEL_FALLBACKS, isRateLimitError } from './core/utils/index.js';
 export type { RetryOptions } from './core/utils/index.js';
 
+// ─── Dashboard Reporter ───────────────────────────────────────────────────────
+export { DashboardReporter } from './dashboard-reporter.js';
+export type {
+  DashboardEvent,
+  DashboardEventType,
+  DashboardReporterConfig,
+  RunStartedPayload,
+  RunCompletedPayload,
+  TaskCreatedPayload,
+  TaskCompletedPayload,
+  StepStartedPayload,
+  StepCompletedPayload,
+} from './dashboard-reporter.js';
+
 // ─── Bridge ───────────────────────────────────────────────────────────────────
 export { BridgeServer } from './bridge/bridge.js';
 export { ConvexBridgeAdapter } from './bridge/convex-adapter.js';
