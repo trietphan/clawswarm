@@ -26,7 +26,6 @@ import type {
   Task,
   AgentType,
   ReviewResult,
-  GoalResult,
 } from '../core/types.js';
 import type {
   DashboardBridgeConfig,
