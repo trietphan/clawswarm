@@ -1,0 +1,12 @@
+{
+  "taskId": "task-1775294896495-uh35m",
+  "goalId": "goal-1775294896495-shv1f",
+  "deliverables": [
+    {
+      "type": "text",
+      "label": "Mock Output",
+      "content": "mock content"
+    }
+  ],
+  "completedAt": 1775294896496
+}

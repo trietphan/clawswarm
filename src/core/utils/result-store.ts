@@ -7,12 +7,89 @@
  *     goals/<goalId>.json   — Goal snapshot
  *     tasks/<taskId>.json   — Task snapshot (including partial deliverables)
  *
+ * Also exposes a higher-level `StoredResult` API for persisting task deliverables
+ * using a flat file-per-result layout under a configurable results dir.
+ *
  * @module @clawswarm/core/utils/result-store
  */
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import type { Goal, Task } from '../types.js';
+
+// ─── StoredResult (high-level deliverable persistence) ───────────────────────
+
+/**
+ * A persisted record of task deliverables.
+ */
+export interface StoredResult {
+  taskId: string;
+  goalId: string;
+  deliverables: Array<{ type: string; label: string; content: string }>;
+  completedAt: number;
+  modelUsed?: string;
+  tokensUsed?: number;
+}
+
+/**
+ * High-level store for persisting task deliverables.
+ * Files are written to `<dir>/<taskId>-<timestamp>.json`.
+ *
+ * This is separate from the low-level `ResultStore` (goal/task snapshots).
+ * Import via `import { DeliverableStore } from '@clawswarm/core/utils/result-store'`.
+ *
+ * @example
+ * ```typescript
+ * const store = new DeliverableStore('.clawswarm/results');
+ * await store.save({ taskId: 't1', goalId: 'g1', deliverables: [], completedAt: Date.now() });
+ * const latest = await store.load('t1');
+ * ```
+ */
+export class DeliverableStore {
+  private dir: string;
+
+  constructor(dir: string = '.clawswarm/results') {
+    this.dir = dir;
+  }
+
+  async save(result: StoredResult): Promise<string> {
+    mkdirSync(this.dir, { recursive: true });
+    const filename = `${result.taskId}-${Date.now()}.json`;
+    const path = join(this.dir, filename);
+    writeFileSync(path, JSON.stringify(result, null, 2), 'utf-8');
+    return path;
+  }
+
+  async load(taskId: string): Promise<StoredResult | null> {
+    try {
+      const files = readdirSync(this.dir);
+      const matching = files.filter(f => f.startsWith(taskId)).sort().reverse();
+      if (matching.length === 0) return null;
+      const data = readFileSync(join(this.dir, matching[0]), 'utf-8');
+      return JSON.parse(data) as StoredResult;
+    } catch {
+      return null;
+    }
+  }
+
+  async listByGoal(goalId: string): Promise<StoredResult[]> {
+    try {
+      const files = readdirSync(this.dir);
+      const results: StoredResult[] = [];
+      for (const f of files) {
+        try {
+          const data = JSON.parse(readFileSync(join(this.dir, f), 'utf-8')) as StoredResult;
+          if (data.goalId === goalId) results.push(data);
+        } catch {
+          // skip malformed files
+        }
+      }
+      return results;
+    } catch {
+      return [];
+    }
+  }
+}
 
 export interface PersistedTaskState {
   task: Task;

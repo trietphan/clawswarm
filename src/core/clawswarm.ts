@@ -12,6 +12,7 @@ import { Agent } from './agent.js';
 import { GoalManager, GoalPlanner } from './goal.js';
 import { TaskManager } from './task.js';
 import { ChiefReviewer } from './chief.js';
+import { DeliverableStore } from './utils/result-store.js';
 import {
   SwarmConfig,
   SwarmEvents,
@@ -51,6 +52,7 @@ export class ClawSwarm extends EventEmitter<SwarmEvents> {
   private readonly reviewer: ChiefReviewer;
   private readonly agents: Map<AgentType, Agent>;
   private readonly config: SwarmConfig;
+  private readonly deliverableStore: DeliverableStore;
 
   constructor(config: SwarmConfig) {
     super();
@@ -60,6 +62,9 @@ export class ClawSwarm extends EventEmitter<SwarmEvents> {
     this.planner = new GoalPlanner(config);
     this.reviewer = new ChiefReviewer(config.chiefReview);
     this.agents = new Map();
+    this.deliverableStore = new DeliverableStore(
+      (config as SwarmConfig & { resultsDir?: string }).resultsDir ?? '.clawswarm/results'
+    );
 
     // Register agents
     for (const agentConfig of config.agents) {
@@ -255,6 +260,7 @@ export class ClawSwarm extends EventEmitter<SwarmEvents> {
       case 'approved': {
         this.taskManager.approve(task.id);
         this.taskManager.complete(task.id);
+        await this._persistTaskResult(task);
         break;
       }
 
@@ -264,6 +270,7 @@ export class ClawSwarm extends EventEmitter<SwarmEvents> {
         // For automated flows, we treat it as approved after emitting the event
         this.taskManager.approve(task.id);
         this.taskManager.complete(task.id);
+        await this._persistTaskResult(task);
         break;
       }
 
@@ -308,6 +315,36 @@ export class ClawSwarm extends EventEmitter<SwarmEvents> {
         }
         break;
       }
+    }
+  }
+
+  /**
+   * Persist a completed task's deliverables to disk via DeliverableStore.
+   * Non-fatal: errors are swallowed so they don't break the pipeline.
+   * @internal
+   */
+  private async _persistTaskResult(task: Task): Promise<void> {
+    try {
+      const latestTask = this.taskManager.get(task.id) ?? task;
+      const tokenUsage = (latestTask as unknown as Record<string, unknown>)._tokenUsage as
+        { totalTokens?: number } | undefined;
+      const modelUsed = (latestTask as unknown as Record<string, unknown>)._modelUsed as
+        string | undefined;
+
+      await this.deliverableStore.save({
+        taskId: latestTask.id,
+        goalId: latestTask.goalId,
+        deliverables: latestTask.deliverables.map(d => ({
+          type: d.type,
+          label: d.label,
+          content: d.content,
+        })),
+        completedAt: Date.now(),
+        modelUsed,
+        tokensUsed: tokenUsage?.totalTokens,
+      });
+    } catch {
+      // Non-fatal: persistence failures should not crash the pipeline
     }
   }
 }

@@ -1,0 +1,12 @@
+{
+  "taskId": "task-1775295502808-2kjdk",
+  "goalId": "goal-1775295502808-8eyzh",
+  "deliverables": [
+    {
+      "type": "text",
+      "label": "Mock Output",
+      "content": "Mock deliverable content. Mock deliverable content. Mock deliverable content. Mock deliverable content. Mock deliverable content. Mock deliverable content. Mock deliverable content. Mock deliverable content. Mock deliverable content. Mock deliverable content. "
+    }
+  ],
+  "completedAt": 1775295502808
+}

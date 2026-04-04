@@ -5,8 +5,8 @@
 
 export { withTimeout, withRetry, LLMTimeoutError } from './timeout.js';
 export type { } from './timeout.js';
-export { ResultStore } from './result-store.js';
-export type { PersistedTaskState, PersistedGoalState } from './result-store.js';
+export { ResultStore, DeliverableStore } from './result-store.js';
+export type { PersistedTaskState, PersistedGoalState, StoredResult } from './result-store.js';
 
 // New retry utility (more feature-rich than the one in timeout.ts)
 export { withRetry as withSmartRetry, isRetryable } from './retry.js';

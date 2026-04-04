@@ -19,8 +19,8 @@ export { TaskManager } from './core/task.js';
 export { ChiefReviewer } from './core/chief.js';
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
-export { withTimeout, withRetry, LLMTimeoutError, ResultStore } from './core/utils/index.js';
-export type { PersistedTaskState, PersistedGoalState } from './core/utils/index.js';
+export { withTimeout, withRetry, LLMTimeoutError, ResultStore, DeliverableStore } from './core/utils/index.js';
+export type { PersistedTaskState, PersistedGoalState, StoredResult } from './core/utils/index.js';
 export { withSmartRetry, isRetryable, chatWithFallback, getFallbackChain, MODEL_FALLBACKS, isRateLimitError } from './core/utils/index.js';
 export type { RetryOptions } from './core/utils/index.js';
 

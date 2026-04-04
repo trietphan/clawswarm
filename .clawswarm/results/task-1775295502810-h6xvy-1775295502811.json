@@ -1,0 +1,12 @@
+{
+  "taskId": "task-1775295502810-h6xvy",
+  "goalId": "goal-1775295502809-7zw29",
+  "deliverables": [
+    {
+      "type": "text",
+      "label": "Mock Output",
+      "content": "This is a mock deliverable with enough content to pass review. This is a mock deliverable with enough content to pass review. This is a mock deliverable with enough content to pass review. This is a mock deliverable with enough content to pass review. This is a mock deliverable with enough content to pass review. "
+    }
+  ],
+  "completedAt": 1775295502811
+}
