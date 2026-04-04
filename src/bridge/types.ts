@@ -217,14 +217,15 @@ export interface DashboardBridgeConfig {
 
 /**
  * A single stream event sent to the dashboard via `/api/bridge/stream-events`.
+ * Shape matches the `storeBatch` Convex mutation schema.
  */
 export interface StreamEvent {
-  /** Event type matching BridgeMessageType or a custom string */
-  type: string;
-  /** ISO timestamp of when the event occurred */
-  timestamp: string;
-  /** Event-specific data payload */
-  data: Record<string, unknown>;
+  /** Convex run ID to associate this event with (OSS goal → Convex goal ID, or "bridge") */
+  runId: string;
+  /** Event type string */
+  eventType: string;
+  /** JSON-serialised event payload */
+  payload: string;
 }
 
 /**

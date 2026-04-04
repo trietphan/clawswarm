@@ -55,6 +55,11 @@ export class DashboardBridge {
   private readonly boardIdMap = new Map<string, string>();
   /** Maps OSS task IDs → Convex task IDs */
   private readonly taskIdMap = new Map<string, string>();
+  /** Maps OSS agent types → Convex agent IDs (populated from agent-start responses) */
+  private readonly agentIdMap = new Map<string, string>();
+
+  /** The current goal ID being processed (used as runId context for stream events) */
+  private _currentGoalId = 'bridge';
 
   /** Pending stream events waiting to be flushed */
   private readonly pendingEvents: StreamEvent[] = [];
@@ -173,22 +178,33 @@ export class DashboardBridge {
   // ─── Event Handlers ──────────────────────────────────────────────────────
 
   private _handleGoalCreated(goal: Goal): void {
+    this._currentGoalId = goal.id;
     void this._syncGoalCreated(goal);
   }
 
   private _handleGoalPlanning(goal: Goal): void {
+    this._currentGoalId = goal.id;
     void this._syncGoalUpdate(goal, 'active');
   }
 
   private _handleGoalCompleted(goal: Goal): void {
-    // Post cost event first, then update goal
+    this._currentGoalId = goal.id;
+
+    // Only send cost event if we have a Convex agent ID from a prior agent-start response
     const tokens = this.tokenUsage.get(goal.id) ?? 0;
     const cents = this.costCents.get(goal.id) ?? 0;
-    if (tokens > 0 || cents > 0) {
-      void this._post('/api/bridge/cost-event', {
-        costCents: cents,
-        tokenUsage: { total: tokens },
-      }).catch(() => undefined);
+    if ((tokens > 0 || cents > 0) && this.agentIdMap.size > 0) {
+      const agentId = this.agentIdMap.values().next().value;
+      if (agentId) {
+        void this._post('/api/bridge/cost-event', {
+          agentId,
+          inputTokens: 0,
+          outputTokens: tokens,
+          costCents: cents,
+          model: 'unknown',
+          source: 'clawswarm',
+        }).catch(() => undefined);
+      }
     }
 
     const summary = goal.deliverables
@@ -200,6 +216,7 @@ export class DashboardBridge {
   }
 
   private _handleGoalFailed(goal: Goal, _error: Error): void {
+    this._currentGoalId = goal.id;
     void this._syncGoalUpdate(goal, 'failed');
     this._queueStreamEvent('goal:failed', { goalId: goal.id, title: goal.title });
   }
@@ -216,6 +233,12 @@ export class DashboardBridge {
     void this._post('/api/bridge/agent-start', {
       role,
       taskId: dashTaskId,
+    }).then(async (res) => {
+      const data = await res.json().catch(() => ({})) as Record<string, unknown>;
+      // Store the Convex agent ID for later cost event attribution
+      if (data['ok'] === true && typeof data['agentId'] === 'string') {
+        this.agentIdMap.set(role, data['agentId'] as string);
+      }
     }).catch(() => undefined);
 
     this._queueStreamEvent('task:started', { taskId: task.id, title: task.title, role });
@@ -225,26 +248,26 @@ export class DashboardBridge {
     const dashTaskId = this.taskIdMap.get(task.id);
     if (!dashTaskId) return;
 
-    const result = {
-      stepId: dashTaskId,
-      status: 'success' as const,
+    // Don't call /api/bridge/report — that endpoint expects a stepId from the steps
+    // table which tasks don't have. Use a stream event for completion tracking instead.
+    this._queueStreamEvent('task:completed', {
+      taskId: task.id,
+      dashTaskId,
+      title: task.title,
       output: task.deliverables.map(d => d.content).join('\n\n'),
-      durationMs: 0,
-    };
-
-    void this._post('/api/bridge/report', result).catch(() => undefined);
-    this._queueStreamEvent('task:completed', { taskId: task.id, title: task.title });
+    });
   }
 
   private _handleTaskReview(task: Task, review: ReviewResult): void {
     const dashTaskId = this.taskIdMap.get(task.id);
     if (!dashTaskId) return;
 
-    // Map OSS decision to dashboard decision format
+    // Map OSS decision to Convex chiefReview mutation format:
+    // "approved" → "approve", "rejected" → "rework" (terminal reject is rare), "human_review" → keep
     const decision = review.decision === 'approved'
-      ? 'approved'
+      ? 'approve'
       : review.decision === 'rejected'
-        ? 'rejected'
+        ? 'rework'
         : 'needs_human_review';
 
     void this._post('/api/bridge/chief-review', {
@@ -390,10 +413,16 @@ export class DashboardBridge {
   // ─── Stream Events ───────────────────────────────────────────────────────
 
   private _queueStreamEvent(type: string, data: Record<string, unknown>): void {
+    // Resolve runId: use Convex goal ID if available, otherwise OSS goal ID or 'bridge'
+    const ossGoalId = data['goalId'] as string | undefined;
+    const runId = (ossGoalId ? this.goalIdMap.get(ossGoalId) : undefined)
+      ?? this.goalIdMap.get(this._currentGoalId)
+      ?? this._currentGoalId;
+
     this.pendingEvents.push({
-      type,
-      timestamp: new Date().toISOString(),
-      data,
+      runId,
+      eventType: type,
+      payload: JSON.stringify(data),
     });
   }
 

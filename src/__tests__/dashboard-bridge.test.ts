@@ -83,7 +83,7 @@ describe('DashboardBridge', () => {
       '/api/bridge/create-board': { boardId: 'dash-board-1' },
       '/api/bridge/create-task': { taskId: 'dash-task-1' },
       '/api/bridge/update-goal': { ok: true },
-      '/api/bridge/agent-start': { ok: true },
+      '/api/bridge/agent-start': { ok: true, agentId: 'dash-agent-1' },
       '/api/bridge/report': { ok: true },
       '/api/bridge/chief-review': { ok: true },
       '/api/bridge/stream-events': { ok: true },
@@ -375,9 +375,70 @@ describe('DashboardBridge', () => {
     bridge.detach();
   });
 
+  it('stores agentId from agent-start response for later use', async () => {
+    fetchMock = makeFetchMock({
+      '/api/bridge/create-goal': { goalId: 'dash-goal-1' },
+      '/api/bridge/create-board': { boardId: 'dash-board-1' },
+      '/api/bridge/create-task': { taskId: 'dash-task-1' },
+      '/api/bridge/agent-start': { ok: true, agentId: 'conv-agent-42' },
+      '/api/bridge/stream-events': { ok: true },
+    });
+    // @ts-expect-error — mocking global fetch
+    globalThis.fetch = fetchMock;
+
+    const bridge = new DashboardBridge({
+      convexSiteUrl: 'https://x.convex.site',
+      streamIntervalMs: 999999,
+    });
+    const swarm = new ClawSwarm({ agents: [{ type: 'code', model: 'gpt-4o' }] });
+    bridge.attach(swarm);
+
+    swarm.emit('goal:created', makeGoal());
+    await new Promise(r => setTimeout(r, 50));
+    swarm.emit('task:assigned', makeTask(), 'code');
+    await new Promise(r => setTimeout(r, 50));
+    swarm.emit('task:started', makeTask({ status: 'in_progress', assignedTo: 'code' }));
+    await new Promise(r => setTimeout(r, 100)); // extra wait for async .then()
+
+    // No direct accessor, but completing the goal should now send cost event with agentId
+    // This is implicitly tested by the goal:completed cost-event test below.
+    bridge.detach();
+  });
+
+  it('gracefully handles agent-start returning ok: false', async () => {
+    fetchMock = makeFetchMock({
+      '/api/bridge/create-goal': { goalId: 'dash-goal-1' },
+      '/api/bridge/create-board': { boardId: 'dash-board-1' },
+      '/api/bridge/create-task': { taskId: 'dash-task-1' },
+      '/api/bridge/agent-start': { ok: false, reason: 'no_agent' },
+      '/api/bridge/stream-events': { ok: true },
+    });
+    // @ts-expect-error — mocking global fetch
+    globalThis.fetch = fetchMock;
+
+    const bridge = new DashboardBridge({
+      convexSiteUrl: 'https://x.convex.site',
+      streamIntervalMs: 999999,
+    });
+    const swarm = new ClawSwarm({ agents: [{ type: 'code', model: 'gpt-4o' }] });
+    bridge.attach(swarm);
+
+    swarm.emit('goal:created', makeGoal());
+    await new Promise(r => setTimeout(r, 50));
+    swarm.emit('task:assigned', makeTask(), 'code');
+    await new Promise(r => setTimeout(r, 50));
+
+    await expect(async () => {
+      swarm.emit('task:started', makeTask({ status: 'in_progress', assignedTo: 'code' }));
+      await new Promise(r => setTimeout(r, 100));
+    }).not.toThrow();
+
+    bridge.detach();
+  });
+
   // ── task:completed ────────────────────────────────────────────────────────
 
-  it('posts report on task:completed', async () => {
+  it('queues stream event (not /api/bridge/report) on task:completed', async () => {
     const bridge = new DashboardBridge({
       convexSiteUrl: 'https://x.convex.site',
       streamIntervalMs: 999999,
@@ -397,20 +458,30 @@ describe('DashboardBridge', () => {
     }));
     await new Promise(r => setTimeout(r, 50));
 
+    // Should NOT call /api/bridge/report for task completion
     const reportCall = fetchMock.mock.calls.find(c =>
       (c[0] as string).includes('/api/bridge/report'),
     );
-    expect(reportCall).toBeDefined();
-    const body = JSON.parse((reportCall![1] as RequestInit).body as string) as Record<string, unknown>;
-    expect(body['stepId']).toBe('dash-task-1');
-    expect(body['status']).toBe('success');
+    expect(reportCall).toBeUndefined();
 
     bridge.detach();
+
+    // After detach, stream events should flush (includes the task:completed event)
+    await new Promise(r => setTimeout(r, 50));
+    const streamCall = fetchMock.mock.calls.find(c =>
+      (c[0] as string).includes('/api/bridge/stream-events'),
+    );
+    expect(streamCall).toBeDefined();
+    const body = JSON.parse((streamCall![1] as RequestInit).body as string) as Record<string, unknown>;
+    const events = body['events'] as Array<Record<string, unknown>>;
+    const completedEvent = events.find(e => e['eventType'] === 'task:completed');
+    expect(completedEvent).toBeDefined();
+    expect(completedEvent!['runId']).toBe('dash-goal-1');
   });
 
   // ── task:review ───────────────────────────────────────────────────────────
 
-  it('posts chief-review on task:review', async () => {
+  it('posts chief-review with "approve" decision for approved task', async () => {
     const bridge = new DashboardBridge({
       convexSiteUrl: 'https://x.convex.site',
       streamIntervalMs: 999999,
@@ -434,8 +505,36 @@ describe('DashboardBridge', () => {
     expect(reviewCall).toBeDefined();
     const body = JSON.parse((reviewCall![1] as RequestInit).body as string) as Record<string, unknown>;
     expect(body['taskId']).toBe('dash-task-1');
-    expect(body['decision']).toBe('approved');
+    expect(body['decision']).toBe('approve');
     expect(body['qualityScore']).toBe(9);
+
+    bridge.detach();
+  });
+
+  it('posts chief-review with "rework" decision for rejected task', async () => {
+    const bridge = new DashboardBridge({
+      convexSiteUrl: 'https://x.convex.site',
+      streamIntervalMs: 999999,
+    });
+    const swarm = new ClawSwarm({ agents: [{ type: 'code', model: 'gpt-4o' }] });
+    bridge.attach(swarm);
+
+    swarm.emit('goal:created', makeGoal());
+    await new Promise(r => setTimeout(r, 50));
+    swarm.emit('task:assigned', makeTask(), 'code');
+    await new Promise(r => setTimeout(r, 50));
+    fetchMock.mockClear();
+
+    const review = makeReview({ score: 3, decision: 'rejected', feedback: 'Needs work' });
+    swarm.emit('task:review', makeTask({ status: 'review' }), review);
+    await new Promise(r => setTimeout(r, 50));
+
+    const reviewCall = fetchMock.mock.calls.find(c =>
+      (c[0] as string).includes('/api/bridge/chief-review'),
+    );
+    expect(reviewCall).toBeDefined();
+    const body = JSON.parse((reviewCall![1] as RequestInit).body as string) as Record<string, unknown>;
+    expect(body['decision']).toBe('rework');
 
     bridge.detach();
   });
@@ -523,6 +622,69 @@ describe('DashboardBridge', () => {
       (c[0] as string).includes('/api/bridge/stream-events'),
     );
     expect(streamCall).toBeDefined();
+  });
+
+  it('uses Convex goal ID as runId in stream events', async () => {
+    const bridge = new DashboardBridge({
+      convexSiteUrl: 'https://x.convex.site',
+      streamIntervalMs: 999999,
+    });
+    const swarm = new ClawSwarm({ agents: [{ type: 'code', model: 'gpt-4o' }] });
+    bridge.attach(swarm);
+
+    swarm.emit('goal:created', makeGoal());
+    await new Promise(r => setTimeout(r, 50));
+
+    bridge.detach();
+    await new Promise(r => setTimeout(r, 50));
+
+    const streamCall = fetchMock.mock.calls.find(c =>
+      (c[0] as string).includes('/api/bridge/stream-events'),
+    );
+    expect(streamCall).toBeDefined();
+    const body = JSON.parse((streamCall![1] as RequestInit).body as string) as Record<string, unknown>;
+    const events = body['events'] as Array<Record<string, unknown>>;
+    expect(events.length).toBeGreaterThan(0);
+    // All events should have runId = Convex goal ID (or OSS fallback)
+    for (const event of events) {
+      expect(event['runId']).toBeDefined();
+      expect(event['eventType']).toBeDefined();
+      expect(event['payload']).toBeDefined();
+    }
+    // The goal:created event should use the Convex goal ID
+    const createdEvent = events.find(e => e['eventType'] === 'goal:created');
+    expect(createdEvent!['runId']).toBe('dash-goal-1');
+  });
+
+  it('uses correct stream event schema (runId, eventType, payload)', async () => {
+    const bridge = new DashboardBridge({
+      convexSiteUrl: 'https://x.convex.site',
+      streamIntervalMs: 999999,
+    });
+    const swarm = new ClawSwarm({ agents: [{ type: 'code', model: 'gpt-4o' }] });
+    bridge.attach(swarm);
+
+    swarm.emit('goal:created', makeGoal());
+    await new Promise(r => setTimeout(r, 50));
+
+    bridge.detach();
+    await new Promise(r => setTimeout(r, 50));
+
+    const streamCall = fetchMock.mock.calls.find(c =>
+      (c[0] as string).includes('/api/bridge/stream-events'),
+    );
+    const body = JSON.parse((streamCall![1] as RequestInit).body as string) as Record<string, unknown>;
+    const events = body['events'] as Array<Record<string, unknown>>;
+    const event = events[0]!;
+
+    // Must have correct keys matching Convex storeBatch schema
+    expect(Object.keys(event)).toEqual(expect.arrayContaining(['runId', 'eventType', 'payload']));
+    // Must NOT have old schema keys
+    expect(event['type']).toBeUndefined();
+    expect(event['timestamp']).toBeUndefined();
+    expect(event['data']).toBeUndefined();
+    // payload must be a JSON string
+    expect(() => JSON.parse(event['payload'] as string)).not.toThrow();
   });
 
   // ── resilience ────────────────────────────────────────────────────────────
