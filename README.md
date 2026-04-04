@@ -2,55 +2,57 @@
 
 # 🐾 ClawSwarm
 
-**A TypeScript framework for orchestrating multi-agent AI swarms with hierarchical review.**
+### Your AI Department, Ready in Minutes
 
-[![npm version](https://img.shields.io/npm/v/clawswarm-ai?color=blue)](https://www.npmjs.com/package/clawswarm-ai)
+[![npm version](https://img.shields.io/npm/v/clawswarm-ai?color=orange)](https://www.npmjs.com/package/clawswarm-ai)
 [![CI](https://github.com/trietphan/clawswarm/actions/workflows/ci.yml/badge.svg)](https://github.com/trietphan/clawswarm/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://makeapullrequest.com)
 
-Describe a goal. ClawSwarm decomposes it into tasks, assigns specialist agents,
-reviews every output through a chief quality gate, and delivers results — automatically.
+One AI agent is fast. A team of agents that collaborate, review each other's work, and remember your business over time is a different category entirely.
 
-[Quick Start](#quick-start) · [Architecture](#architecture) · [Docs](docs/concepts.md) · [Contributing](CONTRIBUTING.md)
+[Get Started](#quick-start) · [Architecture](#architecture) · [Docs](docs/concepts.md) · [Cloud Dashboard](https://clawswarm.app)
+
+<br>
+
+<img src="docs/office-demo.gif" alt="ClawSwarm — agents collaborating in real-time" width="640">
 
 </div>
 
 ---
 
-## Why ClawSwarm?
+## What is ClawSwarm?
 
-Single-agent systems hit a wall — they hallucinate, lose context, and can't self-correct. ClawSwarm takes a different approach: **a team of specialist agents** that plan, execute, and review each other's work, just like a real team.
+ClawSwarm is an open-source TypeScript framework for multi-agent AI orchestration. You describe a goal. The Planner breaks it into tasks and routes each one to the right specialist. A Chief agent reviews every output before it reaches you. If the work isn't good enough, it goes back automatically.
 
-The result? Higher-quality output, automatic error recovery, and full cost visibility across every task.
+The framework ships with four built-in agents:
 
-## ✨ Features
+🔍 **ResearchClaw** — finds information, analyzes data, writes structured reports
 
-- 🎯 **Goal Decomposition** — describe what you want; the planner breaks it into assignable tasks
-- 🤖 **Multi-Model Support** — mix Claude, GPT-4, Gemini, or any OpenAI-compatible provider per agent
-- 🛡️ **Hierarchical Chief Review** — 3-tier quality gate (auto-approve / human review / auto-reject + rework)
-- 🔄 **Auto-Rework Cycles** — failed tasks retry automatically with feedback (configurable max attempts)
-- 🌐 **Real-Time Bridge** — WebSocket-based communication layer for live agent coordination
-- 📊 **Typed Events** — fully typed event system for monitoring, logging, and custom integrations
-- 📦 **Extensible Agents** — add custom agents with specialized tools and system prompts
-- 💰 **Cost Tracking** — per-agent, per-task token usage and cost monitoring out of the box
+🔧 **CodeClaw** — builds features, fixes bugs, writes and runs tests
+
+⚙️ **OpsClaw** — handles deployments, monitoring, and infrastructure
+
+🧠 **Planner** — decomposes goals and assigns tasks to the right agent
+
+Every output goes through a **3-tier Chief Review**: scores of 8 or above auto-approve, 5–7 pings you for a quick human look, and anything under 5 gets rejected and sent back for rework automatically (capped at 3 cycles — no infinite loops).
+
+This is the same engine powering the [ClawSwarm Cloud dashboard](https://clawswarm.app).
+
+---
 
 ## Quick Start
-
-### Install
 
 ```bash
 npm install clawswarm-ai
 ```
 
-### Run Your First Swarm
-
 ```typescript
-import { ClawSwarm, Agent, BridgeServer } from 'clawswarm-ai';
+import { ClawSwarm, Agent } from 'clawswarm-ai';
 
 const swarm = new ClawSwarm({
   agents: [
-    Agent.research({ model: 'claude-sonnet-4' }),
+    Agent.research({ model: 'claude-sonnet-4-6' }),
     Agent.code({ model: 'gpt-4o' }),
     Agent.ops({ model: 'gemini-2.0-flash' }),
   ],
@@ -63,30 +65,16 @@ const swarm = new ClawSwarm({
 
 const result = await swarm.execute({
   title: 'Build a REST API for user management',
-  description: 'Design schema, implement CRUD endpoints, write tests',
+  description: 'Design the schema, implement CRUD endpoints, write tests',
 });
 
 console.log(result.deliverables);
-// → [{ task: 'Design schema', status: 'approved', output: '...' }, ...]
+// [{ task: 'Design schema', status: 'approved', output: '...' }, ...]
 ```
 
-That's it — the planner decomposes the goal, agents execute in parallel where possible, and every output passes chief review before being delivered.
+That's it. The Planner figures out which agents to involve, in what order, and what each needs to produce. You just tell it what you want.
 
-### CLI
-
-```bash
-# Initialize a new project (interactive wizard)
-npx clawswarm init
-
-# Execute a goal from the command line
-npx clawswarm run "Research the top 5 AI frameworks in 2026"
-
-# Start the bridge server for real-time updates
-npx clawswarm start
-
-# Show agent and task status
-npx clawswarm status
-```
+---
 
 ## Architecture
 
@@ -105,169 +93,136 @@ graph TD
     CR1 -->|Score ≥ 8| AP1[✅ Approved]
     CR1 -->|Score 5-7| HR1[👀 Human Review]
     CR1 -->|Score < 5| RW1[🔄 Rework]
+    RW1 -.->|Retry with feedback| A1
     CR2 -->|Score ≥ 8| AP2[✅ Approved]
     CR2 -->|Score 5-7| HR2[👀 Human Review]
     CR2 -->|Score < 5| RW2[🔄 Rework]
+    RW2 -.->|Retry with feedback| A2
     CR3 -->|Score ≥ 8| AP3[✅ Approved]
     CR3 -->|Score 5-7| HR3[👀 Human Review]
     CR3 -->|Score < 5| RW3[🔄 Rework]
-    RW1 -.->|Retry with feedback| A1
-    RW2 -.->|Retry with feedback| A2
     RW3 -.->|Retry with feedback| A3
 ```
 
-<details>
-<summary>ASCII version (for terminals)</summary>
+Agents don't work in isolation. They pass context to each other between steps. A research agent hands its findings directly to the writing agent. A planning agent breaks a feature request into implementation steps that go straight to CodeClaw. The whole thing is coordinated, not just parallel.
 
-```
-  Goal
-   │
-   ▼
-  Planner ──── decomposes into tasks
-   │
-   ├──────────────┬──────────────┐
-   ▼              ▼              ▼
- Task 1        Task 2        Task 3
-   │              │              │
-   ▼              ▼              ▼
-ResearchClaw   CodeClaw      OpsClaw
-   │              │              │
-   ▼              ▼              ▼
-Chief Review   Chief Review   Chief Review
-   │              │              │
-   ├─ ≥8 ✅ Approve  ├─ ≥8 ✅ Approve  ├─ ≥8 ✅ Approve
-   ├─ 5-7 👀 Review  ├─ 5-7 👀 Review  ├─ 5-7 👀 Review
-   └─ <5 🔄 Rework   └─ <5 🔄 Rework   └─ <5 🔄 Rework
-          │                  │                  │
-          └──── retry ───────┘──── retry ───────┘
-```
+---
 
-</details>
+## What's in this repo
 
-## Package Structure
+Three packages under `packages/`:
 
-As of `0.3.0-alpha`, ClawSwarm ships as a **single npm package**:
+**core** is the orchestration engine — goal decomposition, agent routing, chief review, rework cycles, result persistence, and LLM timeout/retry logic. This is the heart of everything.
 
-```
-src/
-├── core/        # Swarm engine: agents, planner, chief review, goal execution
-├── bridge/      # WebSocket bridge for real-time agent communication
-└── cli/         # CLI entry point (clawswarm init, run, start, status)
-```
+**bridge** is a WebSocket server that connects your local agents to the orchestration layer in real time. Agents check in, receive tasks, report results, and the bridge keeps everything synchronized.
 
-All exports are available from the single package:
+**cli** is the command-line tool. `npx clawswarm init` scaffolds a new project. `npx clawswarm start` runs the bridge.
 
-```typescript
-import { ClawSwarm, Agent, BridgeServer } from 'clawswarm-ai';
-import type { SwarmConfig, Goal, Task, AgentType } from 'clawswarm-ai';
-```
+Current version: **v0.4.0-alpha**. The orchestration engine, chief review, result persistence, and LLM reliability features are all working. This is early-stage software — we're building it in public and the API will evolve.
+
+---
 
 ## Configuration
 
 ```typescript
 const config: SwarmConfig = {
-  // Agent definitions
   agents: [
     {
       role: 'research',
-      model: 'claude-sonnet-4',
+      model: 'claude-sonnet-4-6',
       systemPrompt: 'You are a research specialist...',
-      tools: [webSearch, documentReader],
     },
     {
       role: 'code',
       model: 'gpt-4o',
       systemPrompt: 'You are a senior engineer...',
-      tools: [fileSystem, codeRunner],
     },
   ],
 
-  // Chief review settings
   chiefReview: {
     autoApproveThreshold: 8,   // Score ≥ 8 → auto-approved
-    humanReviewThreshold: 5,   // Score 5-7 → needs human sign-off
+    humanReviewThreshold: 5,   // Score 5–7 → human sign-off needed
     maxReworkCycles: 3,        // Retry up to 3 times before escalating
   },
 
-  // Bridge configuration (optional)
   bridge: {
     port: 3001,
     cors: true,
   },
 
-  // Cost limits (optional)
   costLimits: {
-    perTask: 0.50,     // USD per task
-    perGoal: 5.00,     // USD per goal
+    perTask: 0.50,   // USD per task
+    perGoal: 5.00,   // USD per goal
   },
 };
 ```
 
+---
+
+## What changed recently
+
+**LLM reliability** — added `withTimeout()` and `withRetry()` utilities across all three providers. Default timeout is 120 seconds. If a call hangs, it retries cleanly instead of leaving a task stuck.
+
+**Rework circuit breaker** — the old system could theoretically rework forever. Now there's a hard cap (default 3 cycles, configurable). After that it escalates to you instead of burning more tokens.
+
+**Result persistence** — a new `ResultStore` saves goal and task state as JSON snapshots. If the bridge restarts mid-run, it can resume instead of starting over.
+
+**Agent role mapping** — tasks now actually go to the right specialist. ResearchClaw gets research tasks, CodeClaw gets coding tasks. Previously everything defaulted to the main agent, which meant Opus was running everything regardless of the task type.
+
+**DashboardBridge** — a new adapter so the open-source framework can report run status, task progress, and agent activity to the ClawSwarm Cloud dashboard in real time.
+
+**CI with GitHub Actions** — lint and typecheck on every push, Node 22 in the test matrix. The green badge on this README reflects real CI.
+
+---
+
+## What the Cloud dashboard adds
+
+The open-source framework handles orchestration. [ClawSwarm Cloud](https://clawswarm.app) adds the interface on top.
+
+You get a real-time Kanban board where you can watch every task move through the pipeline as it happens. The activity feed logs every agent action, Chief decision, and human escalation. Analytics breaks down token usage and cost per agent and per task over time so you always know what your swarm is spending.
+
+The Virtual Office is a live view of your agents as they work. It sounds like a gimmick but it's genuinely useful when you're trying to figure out where a stuck task is sitting in the pipeline.
+
+Chiefs have persistent memory. The longer they work on your business, the more context they accumulate. They don't start fresh every session — that's the part that makes the biggest difference in practice.
+
+You can approve or reject tasks directly from Discord without opening the dashboard. The review queue shows the work, the Chief's score, and their reasoning. Click approve or request changes and it flows back into the pipeline automatically.
+
+BYOK on every plan — bring your own OpenAI, Anthropic, or Gemini keys. We charge for the platform, not a markup on LLM usage.
+
+---
+
+## Roadmap (honest version)
+
+Done and working: orchestration engine, Chief review with rework, result persistence, LLM timeout handling, CI, WebSocket bridge, Kanban dashboard, Discord integration, activity feed, analytics, cost tracking, goals, blueprints, and DashboardBridge.
+
+Actively building: multi-tenancy (so multiple teams can use the cloud platform), Stripe billing, onboarding wizard, Slack integration, and agent memory that persists across sessions within a goal.
+
+Planned but not started: config versioning and rollback, approval gates for agent configuration changes, full audit trail.
+
+---
+
 ## Documentation
 
-| Page | Description |
-|------|-------------|
-| [Getting Started](docs/getting-started.md) | Installation, setup, first swarm |
-| [Core Concepts](docs/concepts.md) | Agents, goals, tasks, execution model |
-| [Agents](docs/agents.md) | Built-in agents, custom agents, tools |
-| [Chief Review](docs/chief-review.md) | Review tiers, scoring, rework cycles |
-| [Goals & Tasks](docs/goals-and-tasks.md) | Goal decomposition, task lifecycle |
-| [API Reference](docs/api-reference.md) | Full TypeScript API docs |
+[Getting Started](docs/getting-started.md) — first swarm from zero
 
-## Upgrading
+[Core Concepts](docs/concepts.md) — goal/task/chief model explained
 
-### Upgrading from 0.2.0-alpha
+[API Reference](docs/api-reference.md) — full public API surface
 
-If you're upgrading from `0.2.0-alpha` (the 3-package monorepo), here's what changed:
+[Examples](examples/) — working code for common use cases
 
-**Before (0.2.x):**
-```bash
-npm install @clawswarm/core @clawswarm/bridge @clawswarm/cli
-```
-
-```typescript
-import { ClawSwarm } from '@clawswarm/core';
-import { BridgeServer } from '@clawswarm/bridge';
-```
-
-**After (0.3.x):**
-```bash
-npm install clawswarm-ai
-```
-
-```typescript
-import { ClawSwarm, BridgeServer } from 'clawswarm-ai';
-```
-
-**Breaking changes:**
-- All packages merged into a single `clawswarm` package — remove `@clawswarm/core`, `@clawswarm/bridge`, `@clawswarm/cli` from your dependencies
-- Update all imports from `@clawswarm/*` to `clawswarm`
-- `clawswarm init` is now an interactive wizard (use `--yes` to skip prompts and use defaults)
-- New `clawswarm run "<goal>"` command for one-shot goal execution from CLI
-
-### Upgrading from 0.1.0-alpha
-
-**Breaking changes:**
-- `swarm.execute()` now accepts a goal object directly — no need for `swarm.createGoal()` first
-- Bridge auth moved to `BRIDGE_AUTH_TOKENS` env var (comma-separated) instead of hardcoded config
-- Minimum Node.js version bumped to 18.x
-
-**New features:**
-- Chief review system with auto-approve/review/reject thresholds
-- Bridge health endpoint (`GET /health`)
-- Graceful shutdown on SIGTERM/SIGINT
-- Connection limits with `maxConnections`
-- Per-agent cost tracking
-- Full typed event system
-
-See [CHANGELOG.md](CHANGELOG.md) for the complete list.
+---
 
 ## Contributing
 
-We welcome contributions of all kinds — bug fixes, new agents, docs improvements, and feature ideas.
+We're early. If you hit something broken, open an issue. If you want to add something, check [CONTRIBUTING.md](CONTRIBUTING.md) first — contributions should fit the architecture rather than work around it.
 
-See **[CONTRIBUTING.md](CONTRIBUTING.md)** for guidelines on getting started.
+The most useful thing you can do right now is use the framework and tell us what breaks or doesn't make sense. We're building this in public and genuinely want the feedback.
+
+---
 
 ## License
 
-[MIT](LICENSE) © Triet Phan
+MIT — see [LICENSE](LICENSE) for details.
+
+Built by [ToDaMoon](https://github.com/trietphan) · Powered by [OpenClaw](https://openclaw.ai)
