@@ -187,6 +187,62 @@ export interface ConvexAdapterEvents {
   'error': (error: Error) => void;
 }
 
+// ─── Dashboard Bridge ─────────────────────────────────────────────────────────
+
+/**
+ * Configuration for the DashboardBridge.
+ */
+export interface DashboardBridgeConfig {
+  /**
+   * The Convex site URL for the moonclawswarm deployment,
+   * e.g. `https://yourdeployment.convex.site`.
+   * The bridge will call `{convexSiteUrl}/api/bridge/*` endpoints.
+   */
+  convexSiteUrl: string;
+  /**
+   * Optional bridge token sent as the `X-Bridge-Token` header.
+   * Must match `BRIDGE_SECRET` configured in the Convex deployment.
+   */
+  bridgeToken?: string;
+  /**
+   * Optional org ID for multi-tenant deployments.
+   */
+  orgId?: string;
+  /**
+   * How often to flush buffered stream events to the dashboard (ms).
+   * @default 3000
+   */
+  streamIntervalMs?: number;
+}
+
+/**
+ * A single stream event sent to the dashboard via `/api/bridge/stream-events`.
+ */
+export interface StreamEvent {
+  /** Event type matching BridgeMessageType or a custom string */
+  type: string;
+  /** ISO timestamp of when the event occurred */
+  timestamp: string;
+  /** Event-specific data payload */
+  data: Record<string, unknown>;
+}
+
+/**
+ * Payload sent to `/api/bridge/cost-event`.
+ */
+export interface CostEventPayload {
+  agentId?: string;
+  taskId?: string;
+  /** Cost in fractional cents */
+  costCents: number;
+  tokenUsage: {
+    input?: number;
+    output?: number;
+    total?: number;
+  };
+  model?: string;
+}
+
 // ─── Server Config ────────────────────────────────────────────────────────────
 
 /** Configuration for the BridgeServer */

@@ -21,6 +21,7 @@ export { ChiefReviewer } from './core/chief.js';
 // ─── Bridge ───────────────────────────────────────────────────────────────────
 export { BridgeServer } from './bridge/bridge.js';
 export { ConvexBridgeAdapter } from './bridge/convex-adapter.js';
+export { DashboardBridge } from './bridge/dashboard-bridge.js';
 export { TaskRouter } from './bridge/router.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -73,4 +74,8 @@ export type {
   ConvexAdapterEvents,
   ConvexPendingStep,
   ConvexStepResult,
+  // Dashboard bridge types
+  DashboardBridgeConfig,
+  StreamEvent,
+  CostEventPayload,
 } from './bridge/types.js';

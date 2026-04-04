@@ -43,8 +43,15 @@ program
   .description('Execute a goal using the ClawSwarm agent framework')
   .option('-c, --config <path>', 'Path to clawswarm.config.ts')
   .option('-v, --verbose', 'Verbose output')
+  .option('--dashboard-url <url>', 'clawswarm.app dashboard URL (or set CLAWSWARM_DASHBOARD_URL)')
+  .option('--bridge-token <token>', 'Bridge auth token (or set CLAWSWARM_BRIDGE_TOKEN)')
   .action(async (goal: string, opts) => {
-    await runGoal(goal, opts).catch(exitOnError);
+    await runGoal(goal, {
+      config: opts.config as string | undefined,
+      verbose: opts.verbose as boolean | undefined,
+      dashboardUrl: opts.dashboardUrl as string | undefined,
+      bridgeToken: opts.bridgeToken as string | undefined,
+    }).catch(exitOnError);
   });
 
 // ─── start ────────────────────────────────────────────────────────────────────

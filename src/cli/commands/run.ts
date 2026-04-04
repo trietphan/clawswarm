@@ -8,8 +8,9 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ClawSwarm } from '../../core/clawswarm.js';
 import { Agent } from '../../core/agent.js';
+import { DashboardBridge } from '../../bridge/dashboard-bridge.js';
 import { availableProviders, detectProviderName } from '../../core/providers/index.js';
-import type { SwarmConfig, Goal, Task, AgentType } from '../../core/types.js';
+import type { SwarmConfig, Goal, Task, AgentType, GoalResult } from '../../core/types.js';
 import type { ReviewResult } from '../../core/types.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -19,6 +20,10 @@ export interface RunOptions {
   config?: string;
   /** Run in verbose mode */
   verbose?: boolean;
+  /** Dashboard URL for clawswarm.app integration */
+  dashboardUrl?: string;
+  /** Bridge token for dashboard authentication */
+  bridgeToken?: string;
 }
 
 // ─── Defaults ─────────────────────────────────────────────────────────────────
@@ -111,6 +116,20 @@ export async function runGoal(goalDescription: string, options: RunOptions = {})
   // Create swarm
   const swarm = new ClawSwarm(config);
 
+  // Attach dashboard bridge if configured
+  let bridge: DashboardBridge | null = null;
+  const dashboardUrl = options.dashboardUrl ?? process.env.CLAWSWARM_DASHBOARD_URL;
+  const bridgeToken = options.bridgeToken ?? process.env.CLAWSWARM_BRIDGE_TOKEN;
+
+  if (dashboardUrl) {
+    bridge = new DashboardBridge({
+      convexSiteUrl: dashboardUrl,
+      bridgeToken: bridgeToken,
+    });
+    bridge.attach(swarm);
+    console.log(`  🌐 Dashboard bridge: ${dashboardUrl}`);
+  }
+
   // Wire up progress events
   setupEventListeners(swarm, options.verbose ?? false);
 
@@ -125,7 +144,7 @@ export async function runGoal(goalDescription: string, options: RunOptions = {})
   const startTime = Date.now();
 
   try {
-    const result = await swarm.execute(goal);
+    const result = await swarm.execute(goal) as GoalResult;
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
 
     console.log('\n─────────────────────────────────────────────────');
@@ -167,7 +186,10 @@ export async function runGoal(goalDescription: string, options: RunOptions = {})
     } else {
       console.log('\n  ⚠  No deliverables were produced.');
     }
+
+    bridge?.detach();
   } catch (error) {
+    bridge?.detach();
     const err = error instanceof Error ? error : new Error(String(error));
     console.error('\n❌ Goal failed:', err.message);
 
