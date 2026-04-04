@@ -33,8 +33,10 @@ export interface AgentConfig {
   name?: string;
   /** System prompt override */
   systemPrompt?: string;
-  /** Max tokens per request */
+  /** Max tokens per request (default: 8192) */
   maxTokens?: number;
+  /** Timeout in milliseconds for LLM calls (default: 120000 = 2min) */
+  timeoutMs?: number;
   /** Temperature (0-1) */
   temperature?: number;
   /** Tools/capabilities this agent has access to */
@@ -228,6 +230,8 @@ export interface SwarmConfig {
   orgId?: string;
   /** Max concurrent goals */
   maxConcurrentGoals?: number;
+  /** Maximum rework cycles per task before escalating (default: 3) */
+  maxReworks?: number;
 }
 
 /** Result of executing a goal */

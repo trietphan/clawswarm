@@ -6,6 +6,9 @@
 import { AgentConfig, AgentStatus, AgentType, ModelId, Task, Deliverable } from './types.js';
 import { createProvider } from './providers/index.js';
 import type { LLMProvider } from './providers/types.js';
+import { withTimeout, LLMTimeoutError } from './utils/timeout.js';
+import { withRetry as withSmartRetry, isRetryable } from './utils/retry.js';
+import { chatWithFallback } from './utils/model-router.js';
 
 // ─── Agent Base Class ─────────────────────────────────────────────────────────
 
@@ -47,18 +50,15 @@ export class Agent {
   /**
    * Execute a task and return deliverables.
    * Uses the configured LLM provider to complete the task.
+   * Applies timeout, retry-with-backoff, and model fallback automatically.
    *
    * @param task - The task to execute
+   * @param options - Optional execution options
    * @returns Array of deliverables produced
    */
-  async execute(task: Task): Promise<Deliverable[]> {
-    let provider: LLMProvider;
-    try {
-      provider = await createProvider(this.config.model);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      throw new Error(`Agent "${this.name}" cannot create LLM provider for model "${this.config.model}": ${msg}`);
-    }
+  async execute(task: Task, options: { reviewFeedback?: string } = {}): Promise<Deliverable[]> {
+    const timeoutMs = this.config.timeoutMs ?? 120_000;
+    const maxTokens = this.config.maxTokens ?? 8192;
 
     // Build context from dependency outputs (if any)
     const dependencyContext = this._buildDependencyContext(task);
@@ -71,21 +71,53 @@ export class Agent {
       },
       {
         role: 'user' as const,
-        content: this._buildUserPrompt(task, dependencyContext),
+        content: this._buildUserPrompt(task, dependencyContext, options.reviewFeedback),
       },
     ];
 
-    let response;
+    const chatOptions = {
+      model: this.config.model,
+      temperature: this.config.temperature ?? 0.7,
+      maxTokens,
+    };
+
+    let response: { content: string; usage?: { promptTokens: number; completionTokens: number; totalTokens: number }; modelUsed?: string };
+    let timedOut = false;
+
     try {
-      response = await provider.chat(messages, {
-        model: this.config.model,
-        temperature: this.config.temperature ?? 0.7,
-        maxTokens: this.config.maxTokens ?? 8192,
-      });
+      // Wrap with retry (handles 429, 500, 503, econnreset) + timeout + model fallback
+      response = await withSmartRetry(
+        () => withTimeout(
+          chatWithFallback(this.config.model, messages, chatOptions),
+          timeoutMs,
+          `Agent "${this.name}" task "${task.title}"`
+        ),
+        {
+          maxRetries: 3,
+          baseMs: 1000,
+          maxMs: 30_000,
+          shouldRetry: isRetryable,
+        }
+      );
     } catch (err) {
+      if (err instanceof LLMTimeoutError) {
+        // Return a partial result with timedOut flag instead of throwing
+        timedOut = true;
+        const partialContent = `[TIMED OUT after ${timeoutMs}ms] Agent "${this.name}" did not complete task "${task.title}" within the allowed time. Please retry or increase timeoutMs in the agent config.`;
+        return [
+          {
+            type: 'text',
+            label: `${this.name} — ${task.title} (timed out)`,
+            content: partialContent,
+            mimeType: 'text/plain',
+          },
+        ];
+      }
       const msg = err instanceof Error ? err.message : String(err);
       throw new Error(`Agent "${this.name}" LLM call failed for task "${task.title}": ${msg}`);
     }
+
+    void timedOut; // declared above, used in timeout path
 
     const content = response.content.trim();
 
@@ -184,7 +216,7 @@ export class Agent {
 
   // ─── Private Helpers ─────────────────────────────────────────────────────────
 
-  private _buildUserPrompt(task: Task, dependencyContext: string): string {
+  private _buildUserPrompt(task: Task, dependencyContext: string, reviewFeedback?: string): string {
     const parts: string[] = [
       `Task: ${task.title}`,
       `Description: ${task.description}`,
@@ -194,6 +226,14 @@ export class Agent {
       parts.push('');
       parts.push('## Context from previous tasks:');
       parts.push(dependencyContext);
+    }
+
+    if (reviewFeedback) {
+      parts.push('');
+      parts.push('## Reviewer Feedback (please address all points below):');
+      parts.push(reviewFeedback);
+      parts.push('');
+      parts.push('This is a rework — please incorporate the feedback above into your revised output.');
     }
 
     parts.push('');

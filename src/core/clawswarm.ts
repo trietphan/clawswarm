@@ -198,7 +198,7 @@ export class ClawSwarm extends EventEmitter<SwarmEvents> {
    * Execute a single task with the appropriate agent.
    * @internal
    */
-  private async _executeTask(task: Task): Promise<void> {
+  private async _executeTask(task: Task, opts: { reviewFeedback?: string } = {}): Promise<void> {
     const agentType = task.assignedTo ?? 'code';
     const agent = this.agents.get(agentType);
 
@@ -234,7 +234,7 @@ export class ClawSwarm extends EventEmitter<SwarmEvents> {
       this.taskManager.start(task.id);
       this.emit('task:started', task);
 
-      const deliverables = await agent.execute(task);
+      const deliverables = await agent.execute(task, { reviewFeedback: opts.reviewFeedback });
       this.taskManager.submitForReview(task.id, deliverables);
       this.emit('task:completed', task);
     } catch (error) {
@@ -271,10 +271,13 @@ export class ClawSwarm extends EventEmitter<SwarmEvents> {
         this.emit('task:rejected', task, review);
 
         // ── Circuit Breaker ──────────────────────────────────────────────────
-        // If reworkCount has reached maxReworkCycles (from config or task),
+        // If reworkCount has reached maxReworks (from swarm config, then chiefReview config),
         // escalate to human review instead of looping forever.
         const currentTask = this.taskManager.get(task.id)!;
-        const maxRework = this.config.chiefReview?.maxReworkCycles ?? 2;
+        const maxRework =
+          this.config.maxReworks ??
+          this.config.chiefReview?.maxReworkCycles ??
+          3;
 
         if (currentTask.reworkCount >= maxRework) {
           const escalationReview: ReviewResult = {
@@ -293,12 +296,12 @@ export class ClawSwarm extends EventEmitter<SwarmEvents> {
         }
 
         try {
-          // Attempt rework
+          // Attempt rework — pass review feedback so agent can address it
           this.taskManager.rework(task.id, review.feedback);
           this.emit('task:rework', task, review);
-          // Re-execute the task
+          // Re-execute the task with review feedback injected into the prompt
           const updatedTask = this.taskManager.get(task.id)!;
-          await this._executeTask(updatedTask);
+          await this._executeTask(updatedTask, { reviewFeedback: review.feedback });
         } catch {
           // TaskManager.rework() threw (its own maxReworkCycles guard) — reject
           this.taskManager.reject(task.id, review.feedback);
