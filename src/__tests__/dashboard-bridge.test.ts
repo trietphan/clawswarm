@@ -370,7 +370,7 @@ describe('DashboardBridge', () => {
     expect(startCall).toBeDefined();
     const body = JSON.parse((startCall![1] as RequestInit).body as string) as Record<string, unknown>;
     expect(body['taskId']).toBe('dash-task-1');
-    expect(body['role']).toBe('code');
+    expect(body['role']).toBe('developer'); // OSS 'code' maps to dashboard 'developer'
 
     bridge.detach();
   });

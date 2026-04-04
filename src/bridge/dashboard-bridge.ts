@@ -37,6 +37,18 @@ import type {
 
 const DEFAULT_STREAM_INTERVAL_MS = 3_000;
 
+/**
+ * Map OSS agent types to moonclawswarm dashboard role names.
+ * The OSS framework uses short names; the dashboard uses full role identifiers.
+ */
+const ROLE_MAP: Record<string, string> = {
+  research: 'researcher',
+  code: 'developer',
+  ops: 'ops',
+  planner: 'planner',
+  custom: 'developer', // fallback
+};
+
 // ─── DashboardBridge ─────────────────────────────────────────────────────────
 
 /**
@@ -229,7 +241,8 @@ export class DashboardBridge {
     const dashTaskId = this.taskIdMap.get(task.id);
     if (!dashTaskId) return;
 
-    const role = task.assignedTo ?? 'code';
+    const ossRole = task.assignedTo ?? 'code';
+    const role = ROLE_MAP[ossRole] ?? ossRole;
     void this._post('/api/bridge/agent-start', {
       role,
       taskId: dashTaskId,
